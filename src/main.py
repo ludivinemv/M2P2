@@ -210,14 +210,7 @@ for lin in linList:
                 else: 
                     Xt,Yt,Mt,Rt, RR =extract_dataIm(CrossVal,liste_ref,doss,PATH,sess,cl,ratess,interpolSize,RR,reload,spp,npatch,D3,loss)
                 
-                LossTrain=[]
-                LossVal=[]
-                AcurracyTrain=[]
-                AcurracyVal =[]
-                CindexTrain=[]
-                CindexVal =[]
-                train_best=[]
-                val_best=[]
+                LossTrain, LossVal, AcurracyTrain, AcurracyVal, CindexTrain,CindexVal,train_best, val_best =[],[],[],[],[],[],[],[]
                 
             if CrossVal != True :
                 CVNum = 1
