@@ -8,12 +8,6 @@ Copyright (c) 2021 ludivinemv
 """ ########################### OPTIONS ###########################################"""
 import os
 
-ESSAI=True #if TRUE : turn on this computer, with just one fold
-
-if ESSAI==False:
-    milcom =True # run on milcom
-else:
-    milcom= False # run on this computer
 reload = True
 CrossVal = True # if True do cross validation, if False just train/validation/test
 ratess = [0.25,0.25,0.25,0.25] #[0.2,0.2,0.2,0.2,0.2] # distribution in the folders
@@ -26,20 +20,12 @@ stride = 365 #number of days for discretisation
 
 interpolSize = 36 #size of the input images
 
-if ESSAI==False: 
-    tt= 'avecspatial/'#name of the training folder 
-    dossier = './Results/ModeFinalRunVal/' # name of the experience folder 
-
-else:
-    tt= 'lossses_sanssppAtt_pre/' #'Pretrain/ALLGPU12_3Dbin017'#'discretConv1x1'#  #'Pretrain' ## 
-    dossier = './Results/ModeFinalRunVal'
+tt= 'avecspatial/'#name of the training folder 
+dossier = './Results/ModeFinalRunVal/' # name of the experience folder 
 os.makedirs(dossier, exist_ok=True)  # create the folder if it does not exist yet
 
-if milcom == True: #path to the data
-    PATH = "../data/ALL_DATA/Patients/"
-else:
-    my_path = os.path.dirname(os.path.dirname(os.path.realpath('__file__')))
-    PATH = my_path + "/data/ALL_DATA/Patients/"
+my_path = os.path.dirname(os.path.dirname(os.path.realpath('__file__')))
+PATH = my_path + "/data/ALL_DATA/Patients/"
 
 reimpW = False
 doss = './Results/PATIENTS_SEP_TO_KEEP_154CVTsansTest/'
@@ -175,18 +161,16 @@ for lin in linList:
     
     #%%
     breaks=np.arange(0.,365*7,stride)
-    
-    if ESSAI==False:
-        if PRETRAIN==True:
-            parameters = {'Maxi':[False], 'SPP':['False'], 'D3':[True],
+    if PRETRAIN==True:
+        parameters = {'Maxi':[False], 'SPP':['False'], 'D3':[True],
                           'Loss':['cox'],'pretrain':['binary'] ,  #,'textureP','textureF', 'binaryP','binaryF'
                           'LR Pretrain':[1e-04], 'LR Finetune': [1e-04],  'rate' : [0.83] , 
                           'Lrate_decay_learningP' :[1e-07],
                           'lrate_decay_learningF' :[1e-8],'epoch Train' : [20] , 
                           'epoch Finetune': [40] , 'batch size': [10], 'image size':[36],
                           'noTrainLayer': [0] ,'npatch':[3],'dataAug':[15],'attention':['s'],'nbClasses':[7]}
-        else:
-            parameters = {'Maxi':[False], 'SPP':['False'], 'D3':[True],
+    else:
+        parameters = {'Maxi':[False], 'SPP':['False'], 'D3':[True],
                           'Loss':['cox'],'pretrain':['binary'] ,  #,'textureP','textureF', 'binaryP','binaryF'
                           'LR Pretrain':[1e-04], 'LR Finetune': [1e-04],  'rate' : [0.83,0.17,0.5] , 
                           'Lrate_decay_learningP' :[1e-07],
