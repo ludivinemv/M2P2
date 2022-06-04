@@ -888,27 +888,7 @@ for lin in linList:
                                     confB = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                     df_fft=pd.DataFrame(confB)
                                     df_fft.to_csv(file +'/' + titleP + '_confusion_val.csv')
-                                # Calculate mean of val predictions
-                                # if loss != 'classif' and loss != 'triplet'  and loss != 'discret':
-                                #     pathSavepredTr = file+'/' + titleP + '_ped_train'
-                                #     np.save(pathSavepredTr,predictiontrain)
-                                #     pathSavetrueTr = file+'/' + titleP + '_true_train'
-                                #     np.save(pathSavetrueTr,ytrain[:,1])
-                                #     pathSaveeventTr = file+'/' + titleP + '_event_train'
-                                #     np.save(pathSaveeventTr,ytrain[:,0])
-                                #     pathSaveeventTr = file+'/' + titleP + '_r_train'
-                                #     np.save(pathSaveeventTr,rtrain)
-                                
-                                                
-                                #     pathSavepredTr = file+'/' + titleP + '_ped_val'
-                                #     np.save(pathSavepredTr,predictionval)
-                                #     pathSavetrueTr = file+'/' + titleP + '_true_val'
-                                #     np.save(pathSavetrueTr,yval[:,1])
-                                #     pathSaveeventTr = file+'/' + titleP + '_event_val'
-                                #     np.save(pathSaveeventTr,yval[:,0])
-                                #     pathSaveeventTr = file+'/' + titleP + '_r_val'
-                                #     np.save(pathSaveeventTr,rval)
-                                
+
                                 
                                 """  Features ********************************************************************"""
                     
@@ -1216,18 +1196,6 @@ for lin in linList:
                                 writer.add_summary(s) 
                                       
                                 
-                                ''' ######### test TTA'''
-                                # pour chaque goupe d'images, mean de prediction
-                                # predTTA = []
-                                # for i in range(0,len(rtest)):
-                                #     print(rtest[i])
-                                #     predtestA = saved_model.predict([xtestA[i*30:i*30+30],mtestA[i*30:i*30+30]])
-                                #     ppp = np.mean(predtestA)
-                                #     predTTA.append(ppp)
-                                # #toEval = np.array([predTTA,np.ones(np.shape(predTTA))]).T
-                                # cindexTestA = uf.cindexR(ytest[:,1],np.array(predTTA),ytest[:,0])
-                                # cindexTestSa = uf.cindexR(ytest[:,1],np.array(predictiontest),ytest[:,0])
-    
                             curves = plt.imread(doss+'datasep.png')
                             if CV==0:
                                 writer = tf.summary.FileWriter(log_dir)
@@ -1264,11 +1232,6 @@ for lin in linList:
                                 else:
                                     feetest=np.reshape(feetest,(np.shape(feetest)[0],np.shape(feetest)[3]))
                                     
-                                # pathSaveFFT = file+'/' + titleP + '_channel_attention_weight_train'
-                                # np.save(pathSaveFFT,fee) 
-                                
-                                # pathSaveFFT = file+'/' + titleP + '_channel_attention_weight_test'
-                                # np.save(pathSaveFFT,feetest) 
                                 
                                 if D3==False:
                                     if attention != 'c':
@@ -1283,8 +1246,7 @@ for lin in linList:
                                             fee2=np.reshape(fee2,(np.shape(fee2)[0],np.shape(fee2)[1],np.shape(fee2)[2],np.shape(fee2)[3]))
                                         else: 
                                             fee2=np.reshape(fee2,(np.shape(fee2)[0],np.shape(fee2)[1],np.shape(fee2)[2]))
-                                        # pathSaveFFT = file+'/' + titleP + '_spatial_attention_weight_train'
-                                        # np.save(pathSaveFFT,fee2) 
+
                                         
                                         if spp != False:
                                             fee2val = saw.predict([xval,mval])
