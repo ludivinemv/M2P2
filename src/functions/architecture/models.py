@@ -164,8 +164,6 @@ def conv_netFirst(size,D3=False,spp=True,maxi=False):
         model.add(Conv3D(filters=16, kernel_size=3,
                                    strides=1, padding="same", input_shape=(size,size,Third,1), 
                                    name="conv1",kernel_regularizer=regularizers.l2(0.001)))
-                                   # kernel_initializer='zeros',
-                                   #bias_initializer='zeros'))
                                    
         model.add(LeakyReLU(alpha=0.1))
         model.add(InstanceNormalization())
@@ -174,8 +172,6 @@ def conv_netFirst(size,D3=False,spp=True,maxi=False):
         model.add(Conv3D(filters=32, kernel_size=5,
                                    strides=1, padding="same", input_shape=(size,size,Third,1), 
                                    name="conv2",kernel_regularizer=regularizers.l2(0.001)))
-                                    #kernel_initializer='zeros',
-                                    #bias_initializer='zeros'
         model.add(LeakyReLU(alpha=0.1))
         model.add(InstanceNormalization())
         if spp==False:
@@ -183,8 +179,6 @@ def conv_netFirst(size,D3=False,spp=True,maxi=False):
         model.add(Conv3D(filters=64, kernel_size=3,
                                    strides=1, padding="same", input_shape=(size,size,Third,1), 
                                    name="conv3",kernel_regularizer=regularizers.l2(0.001)))
-                                    # kernel_initializer='zeros',
-                                     #bias_initializer='zeros'   
         model.add(LeakyReLU(alpha=0.1))
         model.add(InstanceNormalization())
         
@@ -294,8 +288,6 @@ def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='F
                           strides=1, padding="same", input_shape=(4,4,3), 
                           name="conv1b1",kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01))(output)
             
-          
-        #kernel_initializer='zeros',
         model = LeakyReLU(alpha=0.1)(model)
         model = Dropout(rate = rate)(model)
         if conv1==True:
@@ -350,7 +342,6 @@ def PrepData(rtrain, rtest, rval,PATH,change=False,interpolSize=36,reload=True,c
     y_grp = pf.YProcessing(data,liste_patients,classes)
     xtrain, reftr, xtest, refte , xval, refv, mtrain, mtest, mval =[],[],[],[],[],[],[],[],[]
     for i in range(len(liste_ref)):
-        # #print(i)
         if liste_ref[i] in rtrain:
             xtrain.append(liste_patches[i])
             mtrain.append(liste_mask[i])
@@ -395,7 +386,6 @@ def PrepData(rtrain, rtest, rval,PATH,change=False,interpolSize=36,reload=True,c
 
 def maxPool3DFixeSize(input,n,ksize, strides):
     l=0
-    # print(ksize[0].eval(),ksize[1].eval(),ksize[2].eval(),strides[0].eval(),strides[1].eval(),strides[2].eval())
     for i in range(n):
         for j in range(n):
             for k in range(n):
@@ -406,29 +396,11 @@ def maxPool3DFixeSize(input,n,ksize, strides):
                     out = tf.concat((out,a),axis=0)
                 else:
                     out=a
-                # print(i,j,k,tf.reduce_min(out).eval(),tf.reduce_min(a).eval())
-
                 l=l+1
-#    for i in range(n):
-#        pool = gen_nn_ops.max_pool_v2(input,
-#                                ksize=[ 1,Kernel_size_1, Kernel_size_2, 1],
-#                                strides=[1,stride_1, stride_2, 1],
-#                                padding='SAME')
     out = tf.reshape(out,(1,n,n,n,K.int_shape(input)[4]))
     
             
     return out
-
-# def VGG():
-#     input = Input(shape=(240, 240, 155), name='input')
-#     vgg16 = VGG16(weights='imagenet', include_top=False)
-#     output = vgg16(input) # sortie cnn1
-#     x = Flatten(name='flatten')(output)
-#     #### dense 512
-#     x1 = Dense(256, activation='relu',name='dense1')(x)
-#     extractor = Model(inputs=input, outputs=x1)
-#     return extractor
-
 
 def while_conditionF(i,output,new,box,bins):
     return tf.less(i, tf.shape(output)[0]) # surement None, a changer
@@ -453,32 +425,6 @@ def SPP_Net(input, Pyramid_Levels,D3=False):
 #            a1=tf.stack(tf.zeros([Kernel_size_0,Kernel_size_1,Kernel_size_2]))
 #            pool=MaxPool3D(pool_size=(Kernel_size_0, Kernel_size_1, Kernel_size_2), strides=(stride_0,stride_1,stride_2))(input)
             pool=maxPool3DFixeSize(input,n,(Kernel_size_0,Kernel_size_1, Kernel_size_2), (stride_0,stride_1, stride_2))
-            
-            # def tf_print(op, tensors, message=None):
-            #     def print_message(x):
-            #         sys.stdout.write(message + " %s\n" % x)
-            #         return x
-            
-            #     prints = [tf.py_func(print_message, [tensor], tensor.dtype) for tensor in tensors]
-            #     with tf.control_dependencies(prints):
-            #         op = tf.identity(op)
-            #     return op
-            # Kernel_size_0 = tf_print(Kernel_size_0, [Kernel_size_0], 'Kernel_size_0 = ')
-            # Kernel_size_1 = tf_print(Kernel_size_1, [Kernel_size_1], 'Kernel_size_1 = ')
-            # Kernel_size_2 = tf_print(Kernel_size_2, [Kernel_size_2], 'Kernel_size_2 = ')
-
-            # stride_0 = tf_print(stride_0, [stride_0], 'stride_0 = ')
-            # stride_1 = tf_print(stride_1, [stride_1], 'stride_1 = ')
-            # stride_2 = tf_print(stride_2, [stride_2], 'stride_2 = ')
-
-            # maxi=tf.nn.max_pool(input,
-            #                     ksize=(Kernel_size_0,Kernel_size_1, Kernel_size_2,1),
-            #                     strides=(stride_0,stride_1, stride_2,1), padding='SAME')
-#            pool = gen_nn_ops.max_pool_v2(input,
-#                                ksize=[ 1,Kernel_size_0,Kernel_size_1, Kernel_size_2, 1],
-#                                strides=[1,stride_0,stride_1, stride_2, 1],
-#                                padding='SAME')
-
         pyramid_list.append(tf.reshape(pool, [1, -1]))
     spp_out_fixed_size = tf.concat(pyramid_list, axis=1)
     return spp_out_fixed_size
@@ -501,35 +447,7 @@ def SPP_Net4(input, Pyramid_Levels,D3=False):
         else: 
             stride_2 = tf.cast(tf.floor(tf.cast(input_shape[3] / n, tf.float32)),tf.int32)
             Kernel_size_2 = stride_2 + (input_shape[3] % n)
-#            a1=tf.stack(tf.zeros([Kernel_size_0,Kernel_size_1,Kernel_size_2]))
-#            pool=MaxPool3D(pool_size=(Kernel_size_0, Kernel_size_1, Kernel_size_2), strides=(stride_0,stride_1,stride_2))(input)
             pool=maxPool3DFixeSize(input,n,(Kernel_size_0,Kernel_size_1, Kernel_size_2), (stride_0,stride_1, stride_2))
-            
-            # def tf_print(op, tensors, message=None):
-            #     def print_message(x):
-            #         sys.stdout.write(message + " %s\n" % x)
-            #         return x
-            
-            #     prints = [tf.py_func(print_message, [tensor], tensor.dtype) for tensor in tensors]
-            #     with tf.control_dependencies(prints):
-            #         op = tf.identity(op)
-            #     return op
-            # Kernel_size_0 = tf_print(Kernel_size_0, [Kernel_size_0], 'Kernel_size_0 = ')
-            # Kernel_size_1 = tf_print(Kernel_size_1, [Kernel_size_1], 'Kernel_size_1 = ')
-            # Kernel_size_2 = tf_print(Kernel_size_2, [Kernel_size_2], 'Kernel_size_2 = ')
-
-            # stride_0 = tf_print(stride_0, [stride_0], 'stride_0 = ')
-            # stride_1 = tf_print(stride_1, [stride_1], 'stride_1 = ')
-            # stride_2 = tf_print(stride_2, [stride_2], 'stride_2 = ')
-
-            # maxi=tf.nn.max_pool(input,
-            #                     ksize=(Kernel_size_0,Kernel_size_1, Kernel_size_2,1),
-            #                     strides=(stride_0,stride_1, stride_2,1), padding='SAME')
-#            pool = gen_nn_ops.max_pool_v2(input,
-#                                ksize=[ 1,Kernel_size_0,Kernel_size_1, Kernel_size_2, 1],
-#                                strides=[1,stride_0,stride_1, stride_2, 1],
-#                                padding='SAME')
-
         pyramid_list.append(tf.reshape(pool, [1, -1]))
     spp_out_fixed_size = tf.concat(pyramid_list, axis=1)
     return spp_out_fixed_size
@@ -559,7 +477,6 @@ def bodyF(i,output,new,mask,bins):
     ymin = tf.cast(tf.reduce_min(a1), dtype = tf.int32)
     h2 = tf.cast(tf.reduce_max(a0)-tf.reduce_min(a0), dtype = tf.int32)
     w2 = tf.cast( tf.reduce_max(a1)-tf.reduce_min(a1)  , dtype = tf.int32)
-    #marche si on garde 4 et 2 ou juste 4 ou juste 2, sinon on doit trouver une soluton plus pereine
     h2=tf.cond(tf.equal(h2%4,tf.constant(0)),lambda: h2,lambda:false(h2))
     w2=tf.cond(tf.equal(w2%4,tf.constant(0)),lambda: w2,lambda:false(w2))
     h2=tf.cond(tf.less(h2,tf.constant(4)),lambda: tf.constant(4),lambda:h2)
@@ -610,7 +527,6 @@ def bodyF4(i,output,new,mask,bins):
     ymin = tf.cast(tf.reduce_min(a1), dtype = tf.int32)
     h2 = tf.cast(tf.reduce_max(a0)-tf.reduce_min(a0), dtype = tf.int32)
     w2 = tf.cast( tf.reduce_max(a1)-tf.reduce_min(a1)  , dtype = tf.int32)
-    #marche si on garde 4 et 2 ou juste 4 ou juste 2, sinon on doit trouver une soluton plus pereine
     h2=tf.cond(tf.equal(h2%4,tf.constant(0)),lambda: h2,lambda:false(h2))
     w2=tf.cond(tf.equal(w2%4,tf.constant(0)),lambda: w2,lambda:false(w2))
     h2=tf.cond(tf.less(h2,tf.constant(4)),lambda: tf.constant(4),lambda:h2)
@@ -645,13 +561,6 @@ def bodyF4(i,output,new,mask,bins):
     g2=tf.cond(tf.equal(i,tf.constant(0)), lambda:spp_out_fixed_size, lambda:tf.concat([new,spp_out_fixed_size],axis=0 ) )
     return [tf.add(i, 1),output,g2,mask,bins]
 
- 
-# print(xmin.eval(),ymin.eval(),zmin.eval())
-# print(h2.eval(),w2.eval(),p2.eval())
-# da = np.reshape(xtrain[1,:,:,:,0],(36,36))[xmin:xmin+h2,ymin:ymin+w2,zmin:zmin+p2]
-# print(np.min(da),np.max(da))
-
-
 
 def SPP(output1):
     """Spacial pyramide pooling layer
@@ -664,8 +573,6 @@ def SPP(output1):
     bins = tf.constant([2,4])
     output = output1[0]
     mask = output1[1]
-    # size = tf.map_fn(lambda x: K.int_shape(output)[3]*x*x , bins) #[64*4,64*16] if bins=[2,4] 
-    # sh= tf.reduce_sum(size)
     i = tf.constant(0)
     if  K.int_shape(mask)[3] != 1:
         
@@ -674,10 +581,6 @@ def SPP(output1):
         numm = 1280
     new = tf.stack(tf.zeros([1,numm]),name='new')    #new: (B,sh)
     r = tf.while_loop(while_conditionF, bodyF, loop_vars=[i,output,new,mask,bins], shape_invariants=[i.get_shape(),output.get_shape(), tf.TensorShape([None,None]), mask.get_shape(), bins.get_shape()])           
-    # if  K.int_shape(mask)[3] == 36:
-    #     rr = tf.reshape(r[2],[tf.shape(r[2])[0],8,8,8,9])
-    # else:
-    #     rr = tf.reshape(r[2],[tf.shape(r[2])[0],8,10,16])
     return r[2]
 
 
@@ -693,8 +596,6 @@ def SPP4(output1):
     bins = tf.constant([4])
     output = output1[0]
     mask = output1[1]
-    # size = tf.map_fn(lambda x: K.int_shape(output)[3]*x*x , bins) #[64*4,64*16] if bins=[2,4] 
-    # sh= tf.reduce_sum(size)
     i = tf.constant(0)
     if  K.int_shape(mask)[3] != 1:
         numm = 4096
@@ -702,194 +603,4 @@ def SPP4(output1):
         numm = 1024
     new = tf.stack(tf.zeros([1,numm]),name='new')    #new: (B,sh)
     r = tf.while_loop(while_conditionF, bodyF4, loop_vars=[i,output,new,mask,bins], shape_invariants=[i.get_shape(),output.get_shape(), tf.TensorShape([None,None]), mask.get_shape(), bins.get_shape()])           
-    # if  K.int_shape(mask)[3] == 36:
-    #     rr = tf.reshape(r[2],[tf.shape(r[2])[0],8,8,8,9])
-    # else:
-    #     rr = tf.reshape(r[2],[tf.shape(r[2])[0],8,10,16])
     return r[2]
-
-######### Bilinear model ########
-def BilinearModel(interpolSize,modelCN = None,modelCN2 = None,name2 = "small_2",num=3, mode = 'cox',D3=False,spp=True,attention='False'):
-    if D3==False: 
-        input = Input(shape=(interpolSize, interpolSize, 1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,1))
-    else: 
-        input = Input(shape=(interpolSize, interpolSize, interpolSize,1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,interpolSize,1))
-    modelCN2.name=name2
-    output1 = modelCN([input,mask]) # sortie cnn1 ##shape = (?,9, 9, 64) en non spp
-    output2 = modelCN2([input,mask])
-    output1_shape = K.int_shape(output1)    
-    output2_shape = K.int_shape(output2)
-    if D3==False:
-        output1 = keras.layers.Reshape([output1_shape[1]*output1_shape[2], output1_shape[-1]])(output1) # (None, 81, 64)  
-        output2 = keras.layers.Reshape([output2_shape[1]*output2_shape[2], output2_shape[-1]])(output2)
-    else:
-        output1 = keras.layers.Reshape([output1_shape[1]*output1_shape[2]*output1_shape[3], output1_shape[-1]])(output1) # (None, 81, 64)  
-        output2 = keras.layers.Reshape([output2_shape[1]*output2_shape[2]*output1_shape[3], output2_shape[-1]])(output2)
-    inputs = [output1, output2]
-    bilinearProduct = Lambda(outer_product)(inputs)  #(64*64)
-    
-    res = keras.layers.Reshape([output1_shape[-1]*output2_shape[-1]])(bilinearProduct)
-    x = keras.layers.Lambda(signed_sqrt)(res)
-    x = keras.layers.Lambda(L2_norm)(x)
-#    model = Dense(500,  name="fc1",kernel_regularizer=regularizers.l2(0.001))(x)
-#    model = LeakyReLU(alpha=0.1)(model)
-#    model = Dropout(rate = 0.17)(model)
-#    model = Dense(1000,  name="fc2",kernel_regularizer=regularizers.l2(0.001))(model)
-#    model = LeakyReLU(alpha=0.1)(model)
-#    model = Dropout(rate = 0.17)(model)
-    model = Dense(100,  name="fc3",kernel_regularizer=regularizers.l2(0.001))(x)
-    model = LeakyReLU(alpha=0.1)(model)
-    model = Dropout(rate = 0.17)(model)
-    if mode == 'classif':
-        model = Dense(num,activation = 'softmax', name="fc4",kernel_regularizer=regularizers.l2(0.001))(model)
-    elif mode == 'cox&classif':
-        model1 = Dense(1, activation='linear', name="Partial_likelihood",kernel_regularizer=regularizers.l2(0.001))(model)
-        model2 = Dense(num,activation = 'softmax', name="Cross_entropy_loss",kernel_regularizer=regularizers.l2(0.001))(model)
-    else:
-        model = Dense(1, activation='linear', name="fc4",kernel_regularizer=regularizers.l2(0.001))(model)
-    if mode == 'cox&classif':
-        extractor2 = Model(inputs=[input,mask], outputs=[model1,model2])
-    else:
-        extractor2 = Model(inputs=[input,mask], outputs=model)
-    return extractor2
-
-
-############# Fusion with radiomics ###############
-
-def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='False',rate=0.17,conv1 = False,radiomics=False): #box shape (B,4) box : (xmin,ymin, h,w)
-    #to use fusion with radiomics
-    if D3==False: 
-        input = Input(shape=(interpolSize, interpolSize, 1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,1))
-        modelCN = conv_netFirst(interpolSize,False,spp=spp)
-    elif D3=='2.5':
-        input = Input(shape=(interpolSize, interpolSize, 3), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,3))
-        modelCN = conv_netFirst(interpolSize,'2.5',spp=spp)
-        
-    else: 
-        input = Input(shape=(interpolSize, interpolSize, interpolSize,1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,interpolSize,1))
-        modelCN = conv_netFirst(interpolSize,True,spp=spp)
-    output = modelCN(input) 
-    if spp == True: 
-        # spp21 = RoiPooling3D([output,mask])
-        spp21= Lambda(SPP, name='spp')([output,mask]) 
-        if  D3==False:
-            numm = 1280
-        elif D3=='2.5':
-            numm = 1280
-        else:
-            numm = 4608
-        spp2 = keras.layers.Reshape([numm],name=('resh44'))(spp21)
-    else:
-        if D3==False or D3=='2.5':
-            spp2 = keras.layers.Reshape([K.int_shape(output)[1]*K.int_shape(output)[2]*K.int_shape(output)[3]],name=('resh44'))(output)
-        else: #(?,46656)
-            spp2 = keras.layers.Reshape([K.int_shape(output)[1]*K.int_shape(output)[2]*K.int_shape(output)[3]*K.int_shape(output)[4]],name=('resh44'))(output)
-    if D3 != True:
-        if attention!='False':
-            if spp== True:
-                if D3=='2.5':
-                    spp2=keras.layers.Reshape([8,10,16],name=('res'))(spp2)
-                else:
-                    spp2=keras.layers.Reshape([8,10,16],name=('res'))(spp2)
-            
-            else:
-                spp2=keras.layers.Reshape([K.int_shape(output)[1],K.int_shape(output)[2],K.int_shape(output)[3]],name=('res'))(spp2)
-            y = attach_attention_module(spp2, 'cbam_block',order=attention) #https://github.com/kobiso/CBAM-keras
-            x = keras.layers.add([spp2, y])
-
-            
-            ######## TO decomment if removing convolv 1*1 ##############
-            if conv1 == False:
-                x = keras.layers.Activation('relu')(x)
-
-                spp2=keras.layers.Reshape([K.int_shape(spp2)[1]*K.int_shape(spp2)[2]*K.int_shape(spp2)[3]],name=('res2'))(x)
-            else:
-                spp2= keras.layers.Activation('relu')(x)
-
-            #############################################################
-    else:        
-        if attention!='False':
-            if spp== True:
-                spp2=keras.layers.Reshape([8,8,8,9],name=('res'))(spp2)
-            else:
-                spp2=keras.layers.Reshape([K.int_shape(output)[1],K.int_shape(output)[2],K.int_shape(output)[3],K.int_shape(output)[4]],name=('res'))(spp2)
-
-            y = attach_attention_module3D(spp2, 'cbam_block',order=attention) #https://github.com/kobiso/CBAM-keras
-            x = keras.layers.add([spp2, y])
-
-            x = keras.layers.Activation('relu')(x)
-            ######## TO decomment if removing convolv 1*1 ##############
-            if conv1 == False:            
-                x = keras.layers.Activation('relu')(x)
-                spp2=keras.layers.Reshape([K.int_shape(spp2)[1]*K.int_shape(spp2)[2]*K.int_shape(spp2)[3]*K.int_shape(spp2)[4]],name=('res2'))(x)
-            else:
-                spp2= keras.layers.Activation('relu')(x)
-
-    spp2 = InstanceNormalization()(spp2)
-            #############################################################
-    radiomics_input = Input((11, ), name='radiomics_input')
-    
-    # Concatenate the features
-    if radiomics == True:
-        spp2 = Concatenate(name='concatenation')([spp2, radiomics_input]) 
-            
-    #    model = Dense(300,  name="fc1",kernel_regularizer=regularizers.l2(0.001))(spp2)
-    #    model = LeakyReLU(alpha=0.1)(model)
-    #    model = Dropout(rate = 0.17)(model)
-    #    model = Dense(500,  name="fc2",kernel_regularizer=regularizers.l2(0.001))(model)
-    #    model = LeakyReLU(alpha=0.1)(model)
-    #    model = Dropout(rate = 0.17)(model)
-    if conv1 == False:
-        model = Dense(100, name="fc3",kernel_regularizer=regularizers.l2(0.01),
-                      bias_initializer='zeros')(spp2)
-    else:
-        if D3==True:
-            model = Conv3D(filters=64, kernel_size=1,
-                      strides=1, padding="same", input_shape=(4,4,4,1), 
-                      name="conv1b1",kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01))(spp2)
-        elif D3==False:
-            model = Conv2D(filters=64, kernel_size=1,
-                      strides=1, padding="same", input_shape=(4,4,1), 
-                      name="conv1b1",kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01))(spp2)
-        else:
-            model = Conv2D(filters=64, kernel_size=1,
-                      strides=1, padding="same", input_shape=(4,4,3), 
-                      name="conv1b1",kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01))(spp2)
-        
-      
-    #kernel_initializer='zeros',
-    model = LeakyReLU(alpha=0.1)(model)
-    model = Dropout(rate = rate)(model)
-    if conv1==True:
-        if D3==True:
-            model = GlobalAveragePooling3D()(model)
-        else:
-            model = GlobalAveragePooling2D()(model)
-    
-    if mode == 'classif':
-        model = Dense(num,activation = 'softmax', name="fc4",kernel_regularizer=regularizers.l2(0.001))(model)
-    
-    elif mode == 'cox&classif':
-        model1 = Dense(1, activation='linear', name="Partial_likelihood",kernel_regularizer=regularizers.l2(0.001))(model)
-        model2 = Dense(num,activation = 'softmax', name="Cross_entropy_loss",kernel_regularizer=regularizers.l2(0.001))(model)
-    elif mode== 'discret':
-        stride = 365
-        breaks=np.arange(0.,365*7,stride)
-        n_intervals=len(breaks)-1
-        model= Dense(n_intervals,  name="output",activation = 'softmax',kernel_regularizer=regularizers.l2(0.001))(model)
-    else:
-        model = Dense(1, activation='linear', name="fc4",kernel_regularizer=regularizers.l2(0.001))(model)
-    if radiomics == False:
-        if mode == 'cox&classif':
-            extractor2 = Model(inputs=[input,mask], outputs=[model1,model2])
-        else:
-            extractor2 = Model(inputs=[input,mask], outputs=model)
-    else:
-        extractor2 = Model(inputs=[input,mask,radiomics_input], outputs=model)
-
-    return extractor2

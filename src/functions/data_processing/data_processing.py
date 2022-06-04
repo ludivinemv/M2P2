@@ -32,28 +32,6 @@ from keras.applications.vgg16 import VGG16
 from tensorflow.python.ops import gen_nn_ops
 
 
-def bratsOpen():
-    ''' Output: liste of images (Fair), liste of masks with several labels, liste of [patient, time,event],liste of mask with one label'''
-    path = '../data/BRATS/MICCAI_BraTS_2019_Data_Training/'
-    #open csv
-    filename = path + "survival_dataDeep.csv"
-    data = pd.read_csv(filename,sep=',',names=['patient','time','event'])
-    y=np.array(data.values.tolist())[1:]
-    liste_mask=[]
-    liste_im=[]
-    liste_whole=[]
-    for p in y[:,0]:
-        print(p)
-        mask = nib.load(path + 'Patients/' +p +'/'+p+ '_seg.nii.gz')
-        img = nib.load( path + 'Patients/' +p +'/'+p+  '_flair.nii.gz')
-        img = img.get_fdata()
-        mask = mask.get_fdata()
-        whole = np.where(np.array(mask)!=0,1,0)
-        liste_mask.append(mask)
-        liste_im.append(img)
-        liste_whole.append(whole)
-    return liste_im, liste_mask, y,liste_whole
-
 def createDataAug(numberA=30):
     ''' 
     Input
@@ -251,51 +229,6 @@ def dataAugmentation(da,x,y,m,ref,D3=True,num = 30,fold=5):
     else:
         xt=np.reshape(xt,(np.shape(xt)[0],np.shape(xt)[1],np.shape(xt)[2],1))
         mt=np.reshape(mt,(np.shape(mt)[0],np.shape(mt)[1],np.shape(mt)[2],1))
-    
-#    datagen = ImageDataGenerator( rotation_range=rotation_range,
-#            width_shift_range=width_shift_range, height_shift_range=height_shift_range,
-#            rescale=rescale,shear_range=shear_range,  zoom_range=zoom_range,
-#            horizontal_flip=horizontal_flip, fill_mode=fill_mode)
-#    datagen = ImageDataGenerator(  rotation_range=40, width_shift_range=0.8,
-#            height_shift_range=0.3, rescale=1.2, shear_range=0.0,     zoom_range=0.4,
-#            horizontal_flip=True,   fill_mode='nearest')
-#    if D3!=True: 
-#        x=x[:,:,:,0]
-#        x = x.reshape( x.shape + (1,))
-#        mask=mask[:,:,:,0]
-#        mask = mask.reshape( mask.shape + (1,))
-#    else:
-#        x=x[:,:,:,:,0]
-#        mask=mask[:,:,:,:,0]
-#    yt =[]  # shape (4347, 2)
-#    xt=[] #shape (4347, 1, 36, 36, 1)
-#    maskt=[] #shape (4347, 1, 36, 36, 1)
-#    for k in range (x.shape[0]):    
-#        i = 0
-#        for batch in datagen.flow(x,mask, batch_size=1):
-##                                  ,save_to_dir='./files/augmentation/', save_prefix='Black', save_format='jpeg'):
-#            xt.append(batch[0])
-#            maskt.append(batch[1])
-#            i += 1
-#            yt.append(y[k])
-#            if i > number:
-#                break  
-#    xt=np.array(xt)    
-#    maskt=np.array(maskt)
-#
-#    if D3== True:
-#        xt=np.reshape(xt,(np.shape(xt)[0],np.shape(xt)[2],np.shape(xt)[3],np.shape(xt)[4],1))
-#        maskt=np.reshape(maskt,(np.shape(maskt)[0],np.shape(maskt)[2],np.shape(maskt)[3],np.shape(maskt)[4],1))
-#    else:
-#        xt=np.reshape(xt,(np.shape(xt)[0],np.shape(xt)[2],np.shape(xt)[3],1))
-#        maskt=np.reshape(maskt,(np.shape(maskt)[0],np.shape(maskt)[2],np.shape(maskt)[3],1))
-#    yt=np.array(yt)
-#    from PIL import Image
-#    im = Image.open("files/augmentation/Black_0_237.jpeg")
-#    plt.imshow(np.array(im))
-#    plt.imshow(x[0,:,:,0])
-#    
-#    x = np.array(Image.open("files/augmentation/la.jpg"))
     return xt,yt,mt,rt
 
 
