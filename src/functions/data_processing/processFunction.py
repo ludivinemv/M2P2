@@ -8,7 +8,7 @@ Processing of the images and true values
 """
 
 import os
-from Bpatch_preprocessing import patch_preprocessing as pp
+from patch_preprocessing import patch_preprocessing as pp
 import numpy as np
 import pandas as pd
 #from PIL import Image

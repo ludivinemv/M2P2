@@ -6,7 +6,6 @@ Copyright (c) 2021 ludivinemv
 
 Extract patches to pass from 3D to 2D
 """
-import functions.usefull_functions as uf
 from PIL import Image
 import pandas as pd
 #import re
@@ -18,9 +17,9 @@ import os
 import SimpleITK as sitk
 from skimage.external import tifffile
 #from skimage.io import imsave
-from functions.Patient import correction
+from Patient import correction
 #import cv2 as cv
-
+from data_processing import *
 #import matplotlib.pyplot as plt
 class patch_preprocessing:
 

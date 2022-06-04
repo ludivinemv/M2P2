@@ -47,12 +47,12 @@ os.makedirs(doss, exist_ok=True)
 PRETRAIN = False #if True run pretraining
 
 """############################  PACKAGES ########################################"""
-import functions.survivalTripletloss as striplet
+import functions.losses.survivalTripletloss as striplet
 from sklearn.utils import shuffle
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 import numpy as np
-from functions.triplet_loss import batch_hard_triplet_loss
+from functions.losses.triplet_loss import batch_hard_triplet_loss
 #import functions.usefull_functions as uf
 import pandas as pd
 from vis.utils import utils
@@ -77,11 +77,11 @@ import keras.backend as K
 import time
 #import functions.survival.nnet_survival as ns
 #from functions.specific_functionsCVorder import *
-import functions.models as mds
-import functions.data_processing as dpr
-import functions.losses as lss
-import functions.pretraining as ptg
-import data_prep
+import functions.architecture.models as mds
+import functions.data_processing.data_processing as dpr
+import functions.losses.losses as lss
+import functions.data_processing.pretraining as ptg
+import functions.data_processing.data_prep
 
 
 
