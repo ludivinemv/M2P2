@@ -3,6 +3,8 @@
 MIT License
 
 Copyright (c) 2021 ludivinemv
+code found in https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/model/triplet_loss.py
+and adapted to survival analysis
 """
 
 import tensorflow as tf

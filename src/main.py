@@ -12,21 +12,17 @@ reload = True
 CrossVal = True # if True do cross validation, if False just train/validation/test
 ratess = [0.25,0.25,0.25,0.25] #[0.2,0.2,0.2,0.2,0.2] # distribution in the folders
 TEST  = False #if True have a test set
-#BEST =0
-#pBEST = {}
-Maxi=False
+Maxi= False
 ratio = 50 #ratio for binary pretraining
 stride = 365 #number of days for discretisation
-
 interpolSize = 36 #size of the input images
 
+#Folder names
 tt= 'avecspatial/'#name of the training folder 
 dossier = './Results/ModeFinalRunVal/' # name of the experience folder 
 os.makedirs(dossier, exist_ok=True)  # create the folder if it does not exist yet
-
 my_path = os.path.dirname(os.path.dirname(os.path.realpath('__file__')))
 PATH = my_path + "/data/ALL_DATA/Patients/"
-
 reimpW = False
 doss = './Results/PATIENTS_SEP_TO_KEEP_154CVTsansTest/'
 os.makedirs(doss, exist_ok=True) 
@@ -39,7 +35,6 @@ from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 import numpy as np
 from functions.losses.triplet_loss import batch_hard_triplet_loss
-#import functions.usefull_functions as uf
 import pandas as pd
 from vis.utils import utils
 from keras import regularizers
@@ -61,8 +56,6 @@ from keras.models import Model
 import tensorflow as tf
 import keras.backend as K
 import time
-#import functions.survival.nnet_survival as ns
-#from functions.specific_functionsCVorder import *
 import functions.architecture.models as mds
 import functions.data_processing.data_processing as dpr
 import functions.losses.losses as lss
@@ -71,7 +64,6 @@ import functions.data_processing.data_prep
 
 
 
-# %%
 '''########################### CODE ############################################# '''
 
 if "sess" in locals():     # this code prevent creating many intance of
@@ -81,7 +73,6 @@ K.clear_session()
 sess = tf.Session() #create new tensorflow session
 
 
-#%%
 
 """ ******************** Data augmentation definition ********************"""
 pathda = 'dataAug.npy'
@@ -94,7 +85,6 @@ else:
 
 liste_image, liste_mask,liste_ref = dpr.image_mask_ref(PATH)
 linList = ['all'] #take all the discretised time classes
-# linList = ['sans0','all','sans1','sans2','sans3']
 for lin in linList:    
     print('pretrain2 : ',PRETRAIN) 
     print('************* lin {} *********************'.format(lin))
@@ -159,7 +149,6 @@ for lin in linList:
             Xb2D, Yb2D, Xb3D, Yb3D = ptg.binary_extraction(RR,CrossVal,PATH,sess,TEST=False, interpolSize)
     
     
-    #%%
     breaks=np.arange(0.,365*7,stride)
     if PRETRAIN==True:
         parameters = {'Maxi':[False], 'SPP':['False'], 'D3':[True],
@@ -192,9 +181,7 @@ for lin in linList:
     count =0
     grid = ParameterGrid(parameters)
 
-    for params in grid:
-        # if params['npatch'] == 9:
-        #     params['dataAug'] = 5  
+    for params in grid:  
         gh=gh+1
         print('***************************************')
         print('****** run {} on {} *******************'.format(gh,len(grid)))
@@ -204,8 +191,7 @@ for lin in linList:
     
         p = { 'attention':[attention],'dataAug':[dataAug],'npatch': [npatch],'D3': [D3],'loss' : [loss], 'nbClasses':[nbClasses],'pretrain': [pretrain],'spp': [spp], 'Maxi':[Maxi], 'LR Pretrain':[lratePre],'LR Finetune': [lrateFine],  'epoch F' : [epochF], 'epoch T' : [epochT],'interpolsize' : [interpolSize] , 'batch': [batch],'Lrate_decay_learningP': [LRDecayP],'lrate_decay_learningF': [LRDecayF],'rate': [rate],'noTrainLayer':[noTrainLayer]}
         param = pd.DataFrame.from_dict(p)
-        print(p)             
-    #    try: 
+        print(p)              
         aaa=[str(param.iloc[0].values[i]) for i in range(len(param.iloc[0].values))]
         do = True        
             
@@ -236,7 +222,7 @@ for lin in linList:
             if CrossVal != True :
                 CVNum = 1
             else:
-                CVNum = 1 #len(RR)
+                CVNum = len(RR)
             if TEST == True:
                 CVnum = 1
             timess = '/' +tt 
@@ -307,8 +293,6 @@ for lin in linList:
                     KNum = len(RR)-1
                 if TEST == False:
                     KNum = len(RR)
-                # if ESSAI== True:
-                #     KNum=1
 
                 for k in range(KNum):
                  
@@ -376,7 +360,6 @@ for lin in linList:
                         else:
                             tensorboard = TensorBoard(log_dir=log_dir) 
     
-                        # param.to_csv(PATHEV)
                         
                         """  DATA AUGMENTATION ********************************************************************"""
                         if PRETRAIN == False:
@@ -566,7 +549,7 @@ for lin in linList:
                                 pred = deepConvSurv(interpolSize,mode = 'classif',D3=D3,spp=spp,attention=attention,num=2,rate=rate,conv1=conv1,maxi = Maxi,l11=l2reg)  
                             else:
                                 pred = deepConvSurv(interpolSize,mode = loss ,D3=D3,spp=spp,attention=attention,num=nbClasses,rate=rate,conv1=conv1,maxi = Maxi,l11=l2reg)  
-#%%
+
                         ''' *****************************************'''
                         ''' **************PRETRAINING****************'''
                         ''' *****************************************'''                
@@ -629,16 +612,11 @@ for lin in linList:
                                 binary.append([PREeval_train[1],PREeval_val[1],lratePre,LRDecayP])
                                 np.savetxt(dossier + '/' + 'pretraining/' + "pretrainBinaryResults.csv",binary)
                         if pretrain == 'triplet':
-                            # pred.compile(optimizer=adam(lr=lratePre,decay=paramTriLRDecayP[k]),loss=striplet.batch_hard_triplet_loss(),metrics=[striplet.triplet_metrics]) #cindex_score
-                            # doss2 = './brouillon/triplet/CV0/triplet7_Pre_binary_atc_sppB4_maxiFalse_D3True_n3/'
-                            # doss2 = dossier + './lossses_pretrainT/CV0/triplet7_Pre_False_atc_sppFalse_maxiFalse_D3True_n3/'
                             doss2 = dossier + './Best/CV0/triplet7_Pre_False_atc_sppFalse_maxiFalse_D3True_n3/'
 
-                            # doss2 = dossier + './triplet/CV0/triplet7_Pre_binary_atc_sppB4_maxiFalse_D3True_n3/'
                             we = doss2 + '{}.h5'.format(ww[k])
-                            # we = doss2 + titleP +'best_model.h5'
                             pred.load_weights(we)
-        #%%
+        
                         if pretrain != 'triplet':
                             lay = pred.get_layer(index = -2).output
                         else:
@@ -647,7 +625,6 @@ for lin in linList:
                             lay = Dense(100, name="fc3",kernel_regularizer=regularizers.l2(0.01),
                                         bias_initializer='zeros')(lay)
 
-                            #kernel_initializer='zeros',
                             lay = LeakyReLU(alpha=0.1)(lay)
                             lay = Dropout(rate = rate)(lay)
                             
@@ -695,8 +672,6 @@ for lin in linList:
                                 metrics= 'coxAndrank'
                             elif loss == 'coxAndclassif': 
                                 pred.compile(optimizer=adam(lr=lrateFine,decay=LRDecayF),loss=[lss.__cox_loss(),'categorical_crossentropy'],metrics=[uf.tf_cindexR,'accuracy'],loss_weights = [1.0,1.5]) #cindex_score
-                                # pred.compile(optimizer=adam(lr=lrateFine,decay=LRDecay),
-                                #               loss=lss.__coxPlusClassif_loss(1,2),metrics=[uf.tf_cindexR,'accuracy'] )#cindex_score
                                 metrics = 'coxAndclassif'
                             elif loss == 'discret':
                                 pred.compile(optimizer=adam(lr=lrateFine,decay=LRDecayF), loss=ns.surv_likelihood(n_intervals),metrics=[uf.tf_cindexTD]) #cindex_score
@@ -740,21 +715,17 @@ for lin in linList:
                                 predictionval=Newmodel.predict([xval,mval])
                                 predictionvalclass = np.argmax(predictionval[1],axis=1)
                                 predictionval=predictionval[0]
-                                #%%
+                                
                             elif loss == 'classif' or loss == 'triplet':
                 
-                                mc = ModelCheckpoint( file+'/' + titleP +'best_model.h5', monitor='val_tf_cindexT', mode='max', verbose=1, save_best_only=True)#'val_tf_cindexT'
-                                # mcAc = ModelCheckpoint( file+'/' + titleP +'best_modelAcc.h5', monitor='val_accuracy', mode='max', verbose=1, save_best_only=True)
-                
+                                mc = ModelCheckpoint( file+'/' + titleP +'best_model.h5', monitor='val_tf_cindexT', mode='max', verbose=1, save_best_only=True)#'val_tf_cindexT'               
                                 fitting = pred.fit([xtrain,mtrain], ytraingrp, validation_data=([xval,mval], yvalgrp), batch_size=batch,epochs=epochF, callbacks=[mc,tensorboard])#,mcAc
                                 if loss == 'triplet':
                                     
                                     saved_model = load_model(file+'/' + titleP +'best_model.h5',custom_objects={'bodyF':uf.bodyF,'bodyF4':uf.bodyF4,'while_conditionF':uf.while_conditionF,'tf':tensorflow,'spp':uf.SPP,'spp4':uf.SPP4,'tf_cindexT':uf.tf_cindexT,'loss':batch_hard_triplet_loss(), 'InstanceNormalization':InstanceNormalization})
-                                    # saved_modelAcc = load_model(file+'/' + titleP +'best_modelAcc.h5',custom_objects={'bodyF':uf.bodyF,'while_conditionF':uf.while_conditionF,'tf':tensorflow,'spp':uf.SPP,'tf_cindexT':uf.tf_cindexT,'loss':triplet(), 'InstanceNormalization':InstanceNormalization})
     
                                 else:
                                     saved_model = load_model(file+'/' + titleP +'best_model.h5',custom_objects={'bodyF':uf.bodyF,'bodyF4':uf.bodyF4,'while_conditionF':uf.while_conditionF,'tf':tensorflow,'spp':uf.SPP,'spp4':uf.SPP4,'tf_cindexT':uf.tf_cindexT,'loss':'categorical_crossentropy', 'InstanceNormalization':InstanceNormalization})
-                                    # saved_modelAcc = load_model(file+'/' + titleP +'best_modelAcc.h5',custom_objects={'bodyF':uf.bodyF,'while_conditionF':uf.while_conditionF,'tf':tensorflow,'spp':uf.SPP,'tf_cindexT':uf.tf_cindexT,'loss':'categorical_crossentropy', 'InstanceNormalization':InstanceNormalization})
                 
                 
                                 eval_val = pred.evaluate([xval,mval], yvalgrp)
@@ -780,19 +751,14 @@ for lin in linList:
                                 #     eval_test_best= saved_model.evaluate(xtest, ytestgrp)
                                 if spp != False:
                                     predictionvalclass = np.argmax(saved_model.predict([xval,mval]),axis=1)      
-                                    # predictionvalclassAcc = np.argmax(saved_modelAcc.predict([xval,mval]),axis=1)
                 
-                                    # predictiontrainclassAcc = np.argmax(saved_modelAcc.predict([xtrain,mtrain]),axis=1)
                                     predictiontrainclass = np.argmax(saved_model.predict([xtrain,mtrain]),axis=1)
                                     if TEST != False:
                                         predictiontestclass = np.argmax(saved_model.predict([xtest,mtest]),axis=1)  
-                                        # predictiontestclassAcc = np.argmax(saved_modelAcc.predict([xtest,mtest]),axis=1)
                 
                                 else: 
                                     predictionvalclass = np.argmax(saved_model.predict(xval),axis=1)
                                     predictiontrainclass = np.argmax(saved_model.predict(xtrain) ,axis=1)
-                                    # predictionvalclassAcc = np.argmax(saved_modelAcc.predict(xval),axis=1)
-                                    # predictiontrainclassAcc = np.argmax(saved_modelAcc.predict(xtrain) ,axis=1)
                                     if TEST != False:
                                         predictiontest = saved_model.predict(xtest)   
                                         predictiontestclass = np.argmax(predictiontest,axis=1)
@@ -888,11 +854,6 @@ for lin in linList:
                                     saved_model = load_model(file+'/' + titleP +'best_model.h5',custom_objects={'bodyF':uf.bodyF,'bodyF4':uf.bodyF4,'while_conditionF':uf.while_conditionF,'tf':tensorflow,'spp':uf.SPP,'spp4':uf.SPP4,'tf_cindexR':uf.tf_cindexR,'loss':lss.__cox_loss(), 'InstanceNormalization':InstanceNormalization})
 
                             if loss!= 'classif' and loss != 'triplet':      
-
-                                # eval_val = pred.evaluate([xval,mval], yval)
-                                # eval_train = pred.evaluate([xtrain,mtrain], ytrain)
-                                # if TEST != False:  
-                                #     eval_test= pred.evaluate([xtest,mtest], ytest)
                                 if spp != False:
                                     eval_val_best = saved_model.evaluate([xval,mval], yval)
                                     eval_train_best = saved_model.evaluate([xtrain,mtrain], ytrain)
@@ -902,11 +863,6 @@ for lin in linList:
                                 else: 
                                     eval_val_best = saved_model.evaluate(xval, yval)
                                     eval_train_best = saved_model.evaluate(xtrain, ytrain)
-                                        
-                                #         if TEST != False:  
-                                #             eval_test_best= saved_model.evaluate(xtest, ytest)
-                                         
-                                       
                                 if spp != False:
                                     predictionval = saved_model.predict([xval,mval])
                                     predictiontrain = saved_model.predict([xtrain,mtrain])
@@ -939,10 +895,6 @@ for lin in linList:
                                     confB = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                     df_fft=pd.DataFrame(confB)
                                     df_fft.to_csv(file +'/' + titleP + '_confusion_val.csv')
-                                    # confBtf=tf.math.confusion_matrix( pYM, ppr, num_classes=None, weights=None, dtype=tf.dtypes.int32, name=None)
-                                    # s = sess.run(tf.summary.text('confusion_matrix_val', tf.stack(tf.cast(confBtf,tf.string))))
-                                    # writer.add_summary(s)
-                                    
                                 # Calculate mean of val predictions
                                 # if loss != 'classif' and loss != 'triplet'  and loss != 'discret':
                                 #     pathSavepredTr = file+'/' + titleP + '_ped_train'
@@ -970,7 +922,6 @@ for lin in linList:
                                 flat =  saved_model.get_layer(index = utils.find_layer_idx(saved_model,'resh48'))#Newmodel.get_layer(index = -4)
                                 featModel = Model(inputs=saved_model.input, outputs=flat.output)
                                
-                                # featurestrain=featModel.predict([xtrain,mtrain])
                                 featurestrain=featModel.predict(xtrain)
                                 pathSaveFFT = file+'/' + titleP + '_features_flatten_train'
                                 np.save(pathSaveFFT,featurestrain)
@@ -978,7 +929,6 @@ for lin in linList:
                                 df_fft=pd.DataFrame(featurestrain)
                                 df_fft.to_csv(pathCSV_FFT)           
                                 
-                                # featuresval=featModel.predict([xval,mval])
                                 featuresval=featModel.predict(xval)
                                 pathSaveFFT = file+'/' + titleP + '_features_flatten_val'
                                 np.save(pathSaveFFT,featuresval)
@@ -1041,7 +991,6 @@ for lin in linList:
                            
                                 predictionval=np.array(predictionval,dtype='float64')
 
-                                # predictionval=np.reshape(np.array(predictionval,dtype='float64'),(-1,1))
                                 yval=np.array(yval,dtype='float64')
 
                                 df2 = pd.DataFrame(np.array([yval[:,0],yval[:,1],predictionval]).T,index=rval)
@@ -1177,9 +1126,6 @@ for lin in linList:
                                     confB = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                     df_fft=pd.DataFrame(confB)
                                     df_fft.to_csv(file +'/' + titleP + '_confusion_train.csv')
-                                    # confBtf=tf.math.confusion_matrix( pYM, ppr, num_classes=None, weights=None, dtype=tf.dtypes.int32, name=None)
-                                    # s = sess.run(tf.summary.text('confusion_matrix_train', tf.stack(confBtf)))
-                                    # writer.add_summary(s)
                                     
                                     ppr = np.array([ppred / 365 for ppred in predictionval], dtype=np.int)
                                     pYM = np.argmax(yvalgrp,axis = 1)
@@ -1187,9 +1133,6 @@ for lin in linList:
                                     confB = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                     df_fft=pd.DataFrame(confB)
                                     df_fft.to_csv(file +'/' + titleP + '_confusion_valgrp.csv')
-                                    # confBtf=tf.math.confusion_matrix( pYM, ppr, num_classes=None, weights=None, dtype=tf.dtypes.int32, name=None)
-                                    # s = sess.run(tf.summary.text('confusion_matrix_valgrp', tf.stack(confBtf)))
-                                    # writer.add_summary(s)
                                 if TEST != False:
                                     evalu = [tf.convert_to_tensor(['', 'train','val','test']) ,
                                              tf.convert_to_tensor(['loss', str(eval_train_best[0]),str(eval_val_best[0]),str(eval_test_best[0])]),

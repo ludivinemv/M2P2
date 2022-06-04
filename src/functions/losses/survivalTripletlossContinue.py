@@ -4,6 +4,8 @@
 MIT License
 
 Copyright (c) 2021 ludivinemv
+code found in https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/model/triplet_loss.py
+and adapted to survival analysis
 """
 
 import tensorflow as tf
@@ -306,20 +308,12 @@ def select_triplet(labels, event):
     All = tf.clip_by_value(ValidTriplet1 + ValidTriplet2 + ValidTriplet3 +ValidTriplet4, 0,1) 
     return All
 
-# labelsN = [50,150,600,1000,1200,1300,1900]
-# eventN = [1,0,1,0,1,0,1]
-# y_pred=np.random.rand(10,4096)
-# event =tf.cast(tf.expand_dims(tf.constant(eventN), -1),dtype=tf.float32) 
-# labels =tf.cast(tf.expand_dims(tf.constant(labelsN), -1),dtype=tf.float32) 
-# embeddings =tf.cast(tf.constant(y_predN),dtype=tf.float32) 
-# y_true=tf.transpose(tf.constant(np.array([eventN,labelsN]),dtype=tf.float32))
-# y_pred=tf.constant(y_predN,dtype=tf.float32)
 
-# lossT = loss(y_true,y_pred)
 def log10(x):
   numerator = tf.log(x)
   denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
   return numerator / denominator
+
 def batch_hard_triplet_loss(Ymin,Ymax,margin=0.001, squared=False):
     """Build the triplet loss over a batch of embeddings.
 
