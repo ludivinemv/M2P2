@@ -17,4 +17,4 @@ This repository provides the python (Tensorflow) code from our submitted paper -
 
 
 ## Citation
-
+Morvan, L. (2022). Multiple myeloma prognosis from PET images: deep survival losses and contrastive pre-training.
