@@ -1,5 +1,5 @@
 # Multiple myeloma prognosis from PET images:deep survival losses and contrastive pre-training
-**by Ludivine Morvan, Cristina Nanni, Anne-Victoire Michaud, Bastien Jamet, Cl´ement Bailly, Caroline Bodet-Milin, Stephane Chauvie, Cyrille Touzeau, Philippe Moreau, Elena Zamagni, Francoise Kraeber-Bodéré, Thomas Carlier, and Diana Mateus**
+**by Ludivine Morvan, Cristina Nanni, Anne-Victoire Michaud, Bastien Jamet, Clément Bailly, Caroline Bodet-Milin, Stephane Chauvie, Cyrille Touzeau, Philippe Moreau, Elena Zamagni, Francoise Kraeber-Bodéré, Thomas Carlier, and Diana Mateus**
 
 This repository provides the python (Tensorflow) code from our submitted paper -> [techrxiv link](https://www.techrxiv.org/articles/preprint/Multiple_myeloma_prognosis_from_PET_images_deep_survival_losses_and_contrastive_pre-training/20438604) 
 ## Abstract
