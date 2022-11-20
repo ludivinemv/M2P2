@@ -10,11 +10,5 @@ This repository provides the python (Tensorflow) code from our submitted paper -
 **Significance:** This work investigates for the first time deep learning in the context of the survival analysis of multiple myeloma patients from PET images. We show the feasibility of existing losses for this task and introduce two contrastive learning approaches, never used before for survival analysis.
 
 
-## Requirements
-
-
-## Overview
-
-
 ## Citation
 Ludivine Morvan, et al. (2022). Multiple myeloma prognosis from PET images: deep survival losses and contrastive pre-training.
