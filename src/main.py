@@ -211,18 +211,18 @@ if __name__ == "__main__":
             print('***************************************')
             print('***************************************')
 
-            nb_classes,attention,data_augm_size,npatch,D3,loss,pretrain, spp, Maxi , lratePre , lrateFine, epochF,p.interpolation_size,batch,epochT ,lr_decay_f,LRDecayP, rate,noTrainLayer = params['nb_classes'],params['attention'],params['dataAug'],params['npatch'],params['D3'],params['Loss'],params['pretrain'],params['SPP'], params['Maxi'],params['LR Pretrain'],params['LR Finetune'], params['epoch Finetune'],params['image size'],params['batch size'],params['epoch Train'],params['lrate_decay_learningF'],params['Lrate_decay_learningP'], params['rate'], params['noTrainLayer']
+            nb_classes,attention,data_augm_size,npatch,D3,loss,pretrain, spp, Maxi , lratePre , lr_fintuning, epochF,p.interpolation_size,batch,epochT ,lr_decay_fintuning,LRDecayP, rate,noTrainLayer = params['nb_classes'],params['attention'],params['dataAug'],params['npatch'],params['D3'],params['Loss'],params['pretrain'],params['SPP'], params['Maxi'],params['LR Pretrain'],params['LR Finetune'], params['epoch Finetune'],params['image size'],params['batch size'],params['epoch Train'],params['lrate_decay_learningF'],params['Lrate_decay_learningP'], params['rate'], params['noTrainLayer']
         
-            dict_param = { 'attention':[attention],'dataAug':[data_augm_size],'npatch': [npatch],'D3': [D3],'loss' : [loss], 'nb_classes':[nb_classes],'pretrain': [pretrain],'spp': [spp], 'Maxi':[Maxi], 'LR Pretrain':[lratePre],'LR Finetune': [lrateFine],  'epoch F' : [epochF], 'epoch T' : [epochT],'interpolsize' : [p.interpolation_size] , 'batch': [batch],'Lrate_decay_learningP': [LRDecayP],'lrate_decay_learningF': [lr_decay_f],'rate': [rate],'noTrainLayer':[noTrainLayer]}
+            dict_param = { 'attention':[attention],'dataAug':[data_augm_size],'npatch': [npatch],'D3': [D3],'loss' : [loss], 'nb_classes':[nb_classes],'pretrain': [pretrain],'spp': [spp], 'Maxi':[Maxi], 'LR Pretrain':[lratePre],'LR Finetune': [lr_fintuning],  'epoch F' : [epochF], 'epoch T' : [epochT],'interpolsize' : [p.interpolation_size] , 'batch': [batch],'Lrate_decay_learningP': [LRDecayP],'lrate_decay_learningF': [lr_decay_fintuning],'rate': [rate],'noTrainLayer':[noTrainLayer]}
             param = pd.DataFrame.from_dict(dict_param)
             print(dict_param)
                           
-            aaa=[str(param.iloc[0].values[i]) for i in range(len(param.iloc[0].values))]
+            list_mode=[str(param.iloc[0].values[i]) for i in range(len(param.iloc[0].values))]
             
             do = True        
                 
-            if lrateFine > lr_decay_f and do  : 
-                lrd=str(lr_decay_f)[-1]
+            if lr_fintuning > lr_decay_fintuning and do  : 
+                lrd=str(lr_decay_fintuning)[-1]
                 if loss == 'classif':
                     metrics = 'accuracy'
                 else: 
@@ -237,7 +237,7 @@ if __name__ == "__main__":
                     else: 
                         Xt,Yt,Mt,Rt, RR = dataprep.extract_dataIm(p.cross_validation,liste_ref,path_patients,path_data,sess,cl,distribution,p.interpolation_size,RR,p.reload_inputs,spp,npatch,D3,loss)
                     
-                    loss_train, LossVal, AcurracyTrain, AcurracyVal, CindexTrain,CindexVal,train_best, val_best =[],[],[],[],[],[],[],[]
+                    loss_train, loss_valid, AcurracyTrain, AcurracyVal, cindex_train,cindex_val,train_best, val_best =[],[],[],[],[],[],[],[]
                     
                 if not p.cross_validation :
                     cv_number = 1
@@ -259,10 +259,10 @@ if __name__ == "__main__":
                         path_full_df = os.path.join(intermediate_folder, f'FullCV_{CV}.csv')
                         
                         if os.path.exists(path_full_df):
-                            fullcv = pd.read_csv(path_full_df, encoding='utf-8')
-                            fullcv = fullcv.iloc[:,1:].values.tolist()
+                            cv_full = pd.read_csv(path_full_df, encoding='utf-8')
+                            cv_full = cv_full.iloc[:,1:].values.tolist()
                         else:
-                            fullcv = []
+                            cv_full = []
                         
                     if p.cross_validation :
                         if not p.pretrain:
@@ -317,27 +317,27 @@ if __name__ == "__main__":
 
                     for k in range(KNum):
                     
-                        aaa=[f'CV{CV}_K{k}']+[str(param.iloc[0].values[i]) for i in range(len(param.iloc[0].values))]
+                        list_mode=[f'CV{CV}_K{k}']+[str(param.iloc[0].values[i]) for i in range(len(param.iloc[0].values))]
                         
-                        for j in range(len(fullcv)):
-                            fcv = [fullcv[j][0]]   + fullcv[j][-19:]  
+                        for j in range(len(cv_full)):
+                            fcv = [cv_full[j][0]]   + cv_full[j][-19:]  
                             fcv = [str(fcv[i]) for i in range(len(fcv))]
-                            if np.array_equal(aaa,fcv):
+                            if np.array_equal(list_mode,fcv):
                                 do=False
                                                         
                         na = f'{str(gh)}_{str(CV)}_{str(k)}' 
                         
-                        titleP = f'{na}lrP{lratePre}_lrF{lrateFine}b{batch}_eF{epochF}_lrd{lrd}_D{data_augm_size}_r{rate}'
+                        titleP = f'{na}lrP{lratePre}_lrF{lr_fintuning}b{batch}_eF{epochF}_lrd{lrd}_D{data_augm_size}_r{rate}'
                         
                         if loss == 'classif' or loss =='triplet':
-                            lossAtrib = f"{loss}{str(nb_classes)}"
+                            loss_attribute = f"{loss}{str(nb_classes)}"
                         elif loss == 'discret':
-                            lossAtrib = 'disc' + str(n_intervals)
+                            loss_attribute = 'disc' + str(n_intervals)
                         else:
-                            lossAtrib = loss
+                            loss_attribute = loss
                                             
-                        lossAtrib = f"{lossAtrib}_Pre_{pretrain}_"
-                        file_name = os.path.join(intermediate_folder, f'{lossAtrib}at{attention}_spp{spp}_maxi{Maxi}_D3{D3}_n{noTrainLayer}_dim{npatch}')
+                        loss_attribute = f"{loss_attribute}_Pre_{pretrain}_"
+                        file_name = os.path.join(intermediate_folder, f'{loss_attribute}at{attention}_spp{spp}_maxi{Maxi}_D3{D3}_n{noTrainLayer}_dim{npatch}')
                         
                         
                         do=False 
@@ -363,26 +363,24 @@ if __name__ == "__main__":
                             path_full_df = os.path.join(intermediate_folder,f'FullCV_{CV}.csv')
                             
                             if os.path.exists(path_full_df):
-                                fullcv = pd.read_csv(path_full_df, encoding='utf-8')
-                                fullcv = fullcv.iloc[:,1:].values.tolist()
+                                cv_full = pd.read_csv(path_full_df, encoding='utf-8')
+                                cv_full = cv_full.iloc[:,1:].values.tolist()
                             else:
-                                fullcv = []
+                                cv_full = []
             
                             na = str(gh)+'_'+str(CV) +'_'+str(k) 
                             
                             if loss == 'classif' or loss =='triplet':
-                                lossAtrib = loss + str(nb_classes)
+                                loss_attribute = loss + str(nb_classes)
                             elif loss == 'discret':
-                                lossAtrib = 'disc' + str(n_intervals)
+                                loss_attribute = 'disc' + str(n_intervals)
                             else:
-                                lossAtrib = loss
+                                loss_attribute = loss
                                 
-                            lossAtrib = lossAtrib+'_Pre_'+pretrain+ '_'
-                            file_name = os.path.join(intermediate_folder,f'{lossAtrib}at{attention}_spp{spp}_maxi{Maxi}_D3{D3}_n{noTrainLayer}_dim{npatch}')
+                            loss_attribute = loss_attribute+'_Pre_'+pretrain+ '_'
+                            file_name = os.path.join(intermediate_folder,f'{loss_attribute}at{attention}_spp{spp}_maxi{Maxi}_D3{D3}_n{noTrainLayer}_dim{npatch}')
                             os.makedirs(file_name, exist_ok=True)
-                            
-                            PATHEV= os.path.join(file_name, f"{titleP}parameters.csv")
-                        
+                                                    
                             log_dir = os.path.join(file_name, "logs","fit", titleP)
                             
                             if CV== 0 or CV == 2:
@@ -512,36 +510,36 @@ if __name__ == "__main__":
                                     mval = np.reshape(xval,(xval.shape[0],xval.shape[1],xval.shape[2],xval.shape[3]))
         
                                 if loss == 'classif':
-                                    ytraingrp = dpr.YProcessing2(ytrain,nb_classes)
-                                    yvalgrp = dpr.YProcessing2(yval,nb_classes)
+                                    ytrain_grp = dpr.YProcessing2(ytrain,nb_classes)
+                                    yval_grp = dpr.YProcessing2(yval,nb_classes)
                                     if p.use_test_set:
-                                        ytestgrp = dpr.YProcessing2(ytest,nb_classes)
+                                        ytest_grp = dpr.YProcessing2(ytest,nb_classes)
                                         
                                 elif loss == 'triplet':
-                                    ytraingrp = np.transpose(np.concatenate(([ytrain[:,0]],[np.argmax(dpr.YProcessing2(ytrain,nb_classes),axis=1)]),axis=0))
-                                    yvalgrp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.YProcessing2(yval,nb_classes),axis=1)]),axis=0))
+                                    ytrain_grp = np.transpose(np.concatenate(([ytrain[:,0]],[np.argmax(dpr.YProcessing2(ytrain,nb_classes),axis=1)]),axis=0))
+                                    yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.YProcessing2(yval,nb_classes),axis=1)]),axis=0))
                                     if p.use_test_set:
-                                        ytestgrp =np.transpose(np.concatenate(([ytest[:,0]],[np.argmax(dpr.YProcessing2(ytest,nb_classes),axis=1)]),axis=0))
+                                        ytest_grp =np.transpose(np.concatenate(([ytest[:,0]],[np.argmax(dpr.YProcessing2(ytest,nb_classes),axis=1)]),axis=0))
                                 else:
-                                    ytraingrp = uf.YProcessing4(ytrain,'YEAR')
-                                    yvalgrp = uf.YProcessing4(yval,'YEAR')
+                                    ytrain_grp = uf.YProcessing4(ytrain,'YEAR')
+                                    yval_grp = uf.YProcessing4(yval,'YEAR')
                                     if p.use_test_set:
-                                        ytestgrp = uf.YProcessing4(ytest,'YEAR')
+                                        ytest_grp = uf.YProcessing4(ytest,'YEAR')
                                         
-                                    ytraingrpwc = uf.YProcessing4(ytrain,'YEARWC')
-                                    yvalgrpwc = uf.YProcessing4(yval,'YEARWC')
+                                    ytrain_grpwc = uf.YProcessing4(ytrain,'YEARWC')
+                                    yval_grpwc = uf.YProcessing4(yval,'YEARWC')
                                     if p.use_test_set:
-                                        ytestgrpwc = uf.YProcessing4(ytest,'YEARWC')
+                                        ytest_grpwc = uf.YProcessing4(ytest,'YEARWC')
                                         
-                                    ytraingrp3 = uf.YProcessing4(ytrain,'THREE')
-                                    yvalgrp3 = uf.YProcessing4(yval,'THREE')
+                                    ytrain_grp3 = uf.YProcessing4(ytrain,'THREE')
+                                    yval_grp3 = uf.YProcessing4(yval,'THREE')
                                     if p.use_test_set:
-                                        ytestgrp3 = uf.YProcessing4(ytest,'THREE')
+                                        ytest_grp3 = uf.YProcessing4(ytest,'THREE')
                                         
-                                    ytraingrpwc3 = uf.YProcessing4(ytrain,'THREEWC')
-                                    yvalgrpwc3 = uf.YProcessing4(yval,'THREEWC')
+                                    ytrain_grpwc3 = uf.YProcessing4(ytrain,'THREEWC')
+                                    yval_grpwc3 = uf.YProcessing4(yval,'THREEWC')
                                     if p.use_test_set:
-                                        ytestgrpwc3 = uf.YProcessing4(ytest,'THREEWC')
+                                        ytest_grpwc3 = uf.YProcessing4(ytest,'THREEWC')
                                     
                                 if loss=='discret' or loss == 'RankAnddiscret':
                                     if p.use_test_set:
@@ -555,31 +553,31 @@ if __name__ == "__main__":
                             """  model creation ********************************************************************"""    
                             
                             if pretrain == 'triplet':
-                                paramTriLRDecayP = [1e-8,1e-8,1e-12,1e-8]
+                                param_tri_lr_decay_pretraining = [1e-8,1e-8,1e-12,1e-8]
 
                                 ww = ['2_0_0lrP0.0001_lrF0.0001b10_eF20_lrd8_D15_r0.83best_model',
                                     '1_0_1lrP0.0001_lrF0.0001b10_eF20_lrd8_D15_r0.17best_model',
                                     '7_0_2lrP0.0001_lrF0.0001b10_eF20_lrd2_D15_r0.17best_model',
                                     '2_0_3lrP0.0001_lrF0.0001b10_eF20_lrd8_D15_r0.83best_model']
-                                paramTrirate = [0.83,0.17,0.17,0.83]
+                                param_tri_rate = [0.83,0.17,0.17,0.83]
 
                             if not spp:
-                                conv1=False
+                                conv_1=False
                             else:
-                                conv1=False
+                                conv_1=False
                             if bilinear :
-                                modelCN = ConvSurvBefore(p.interpolation_size,D3,spp=spp) 
-                                modelCN2 = ConvSurvBefore(p.interpolation_size,D3,spp=spp) 
-                                pred =  BilinearModel(p.interpolation_size,modelCN = modelCN,modelCN2 = modelCN2, mode = loss,D3=D3,spp=spp,attention=attention,num=nb_classes)
+                                model_cnn = ConvSurvBefore(p.interpolation_size,D3,spp=spp) 
+                                model_cnn_2 = ConvSurvBefore(p.interpolation_size,D3,spp=spp) 
+                                pred =  BilinearModel(p.interpolation_size,modelCN = model_cnn,model_cnn_2 = model_cnn_2, mode = loss,D3=D3,spp=spp,attention=attention,num=nb_classes)
                             else: 
                                 if pretrain == 'triplet':
-                                    # pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=paramTrirate,conv1=conv1,maxi = Maxi)  
-                                    pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv1,maxi = Maxi,l11=l2reg)  
+                                    # pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=param_tri_rate,conv1=conv_1,maxi = Maxi)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
 
                                 elif pretrain == 'binary':
-                                    pred = deepConvSurv(p.interpolation_size,mode = 'classif',D3=D3,spp=spp,attention=attention,num=2,rate=rate,conv1=conv1,maxi = Maxi,l11=l2reg)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = 'classif',D3=D3,spp=spp,attention=attention,num=2,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
                                 else:
-                                    pred = deepConvSurv(p.interpolation_size,mode = loss ,D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv1,maxi = Maxi,l11=l2reg)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = loss ,D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
 
                             ''' *****************************************'''
                             ''' **************PRETRAINING****************'''
@@ -699,29 +697,29 @@ if __name__ == "__main__":
                             if p.pretrain == False:
                                 """ COMPILE  ********************************************************************"""                
                                 if loss == 'cox':  #,clipnorm=0.1
-                                    pred.compile(optimizer=adam(lr=lrateFine,decay=lr_decay_f), loss=lss.__cox_loss(),metrics=[lss.tf_cindexR]) #cindex_score
+                                    pred.compile(optimizer=adam(lr=lr_fintuning,decay=lr_decay_fintuning), loss=lss.__cox_loss(),metrics=[lss.tf_cindexR]) #cindex_score
                                     metrics = 'tf_cindex'
                                 elif loss == 'RankAndmse':
-                                    pred.compile(optimizer=adam(lr=lrateFine,decay=lr_decay_f), loss=lss.__RankAndMse_loss(),metrics=[uf.tf_cindexT,lss.rank,lss.mse]) #cindex_score
+                                    pred.compile(optimizer=adam(lr=lr_fintuning,decay=lr_decay_fintuning), loss=lss.__RankAndMse_loss(),metrics=[uf.tf_cindexT,lss.rank,lss.mse]) #cindex_score
                                     metrics= 'rankAndMSE'
                                 elif loss== 'RankAndcox':
-                                    pred.compile(optimizer=adam(lr=lrateFine,decay=lr_decay_f),loss=lss.__RankAndCox_loss(),metrics=[lss.tf_cindexR,lss.rank,lss.cox]) #cindex_score
+                                    pred.compile(optimizer=adam(lr=lr_fintuning,decay=lr_decay_fintuning),loss=lss.__RankAndCox_loss(),metrics=[lss.tf_cindexR,lss.rank,lss.cox]) #cindex_score
                                     metrics= 'coxAndrank'
                                 elif loss == 'coxAndclassif': 
-                                    pred.compile(optimizer=adam(lr=lrateFine,decay=lr_decay_f),loss=[lss.__cox_loss(),'categorical_crossentropy'],metrics=[lss.tf_cindexR,'accuracy'],loss_weights = [1.0,1.5]) #cindex_score
+                                    pred.compile(optimizer=adam(lr=lr_fintuning,decay=lr_decay_fintuning),loss=[lss.__cox_loss(),'categorical_crossentropy'],metrics=[lss.tf_cindexR,'accuracy'],loss_weights = [1.0,1.5]) #cindex_score
                                     metrics = 'coxAndclassif'
                                 elif loss == 'discret':
-                                    pred.compile(optimizer=adam(lr=lrateFine,decay=lr_decay_f), loss=ns.surv_likelihood(n_intervals),metrics=[uf.tf_cindexTD]) #cindex_score
+                                    pred.compile(optimizer=adam(lr=lr_fintuning,decay=lr_decay_fintuning), loss=ns.surv_likelihood(n_intervals),metrics=[uf.tf_cindexTD]) #cindex_score
                                     metrics = 'tf_cindexTD'
                                 
                                 elif loss == 'RankAnddiscret':
-                                    pred.compile(optimizer=adam(lr=lrateFine,decay=lr_decay_f),loss=ns.RankingAndDiscret(n_intervals), metrics=[uf.tf_cindexTD,ns.discretcox,ns.rankL]) #cindex_score
+                                    pred.compile(optimizer=adam(lr=lr_fintuning,decay=lr_decay_fintuning),loss=ns.RankingAndDiscret(n_intervals), metrics=[uf.tf_cindexTD,ns.discretcox,ns.rankL]) #cindex_score
                                     metrics = 'RankAnddiscret'
                                 elif loss== 'triplet':
-                                    pred.compile(optimizer=adam(lr=lrateFine,decay=lr_decay_f), loss=batch_hard_triplet_loss(),metrics=[ lss.mse,uf.tf_cindexT]) #uf.tf_cindexT,  cindex_score
+                                    pred.compile(optimizer=adam(lr=lr_fintuning,decay=lr_decay_fintuning), loss=batch_hard_triplet_loss(),metrics=[ lss.mse,uf.tf_cindexT]) #uf.tf_cindexT,  cindex_score
                                     metrics = 'triplet'                              
                                 else:
-                                    pred.compile(optimizer=adam(lr=lrateFine,decay=lr_decay_f),
+                                    pred.compile(optimizer=adam(lr=lr_fintuning,decay=lr_decay_fintuning),
                                                 loss='categorical_crossentropy',metrics=['accuracy',uf.tf_cindexT]) #cindex_score
                                     metrics = 'triplet'
                                     
@@ -737,12 +735,12 @@ if __name__ == "__main__":
                                 es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
                                 # fit model               
                                 if loss == 'coxAndclassif':
-                                    fitting = pred.fit([xtrain,mtrain], [ytrain,ytraingrp], validation_data=([xval,mval], [yval,yvalgrp]), batch_size=batch,epochs=epochF,   callbacks=[tensorboard]) #PlotLossesKeras(),
-                                    eval_val = pred.evaluate([xval,mval], [yval,yvalgrp])
-                                    eval_train = pred.evaluate([xtrain,mtrain], [ytrain,ytraingrp])
+                                    fitting = pred.fit([xtrain,mtrain], [ytrain,ytrain_grp], validation_data=([xval,mval], [yval,yval_grp]), batch_size=batch,epochs=epochF,   callbacks=[tensorboard]) #PlotLossesKeras(),
+                                    eval_val = pred.evaluate([xval,mval], [yval,yval_grp])
+                                    eval_train = pred.evaluate([xtrain,mtrain], [ytrain,ytrain_grp])
                                     
                                     if p.use_test_set:
-                                        eval_test= pred.evaluate([xtest,mtest], [ytest,ytestgrp])
+                                        eval_test= pred.evaluate([xtest,mtest], [ytest,ytest_grp])
                                     
                                     Newmodel = pred
                                     
@@ -763,7 +761,7 @@ if __name__ == "__main__":
                     
                                     mc = ModelCheckpoint(best_model_file, monitor='val_tf_cindexT', mode='max', verbose=1, save_best_only=True)#'val_tf_cindexT'               
                                     
-                                    fitting = pred.fit([xtrain,mtrain], ytraingrp, validation_data=([xval,mval], yvalgrp), batch_size=batch,epochs=epochF, callbacks=[mc,tensorboard])#,mcAc
+                                    fitting = pred.fit([xtrain,mtrain], ytrain_grp, validation_data=([xval,mval], yval_grp), batch_size=batch,epochs=epochF, callbacks=[mc,tensorboard])#,mcAc
                                     
                                     if loss == 'triplet':
                                         loss_name = batch_hard_triplet_loss()
@@ -772,11 +770,11 @@ if __name__ == "__main__":
                                     
                                     saved_model = load_model(best_model_file,custom_objects={'bodyF':uf.bodyF,'bodyF4':uf.bodyF4,'while_conditionF':uf.while_conditionF,'tf':tensorflow,'spp':uf.SPP,'spp4':uf.SPP4,'tf_cindexT':uf.tf_cindexT,'loss':loss_name, 'InstanceNormalization':InstanceNormalization})
 
-                                    eval_val = pred.evaluate([xval,mval], yvalgrp)
-                                    eval_train = pred.evaluate([xtrain,mtrain], ytraingrp)
+                                    eval_val = pred.evaluate([xval,mval], yval_grp)
+                                    eval_train = pred.evaluate([xtrain,mtrain], ytrain_grp)
                                     
                                     if p.use_test_set:
-                                        eval_test= pred.evaluate([xtest,mtest], ytestgrp)
+                                        eval_test= pred.evaluate([xtest,mtest], ytest_grp)
                                     
                                     # Newmodel = pred
                                     # if not p.cross_validation :
@@ -788,13 +786,13 @@ if __name__ == "__main__":
                                     # predictionvalclass = np.argmax(predictionval,axis=1)
                                     
                                     # if spp :
-                                    #     eval_val_best = saved_model.evaluate([xval,mval], yvalgrp)
-                                    #     eval_train_best = saved_model.evaluate([xtrain,mtrain], ytraingrp)
-                                    #     eval_test_best= saved_model.evaluate([xtest,mtest], ytestgrp)
+                                    #     eval_val_best = saved_model.evaluate([xval,mval], yval_grp)
+                                    #     eval_train_best = saved_model.evaluate([xtrain,mtrain], ytrain_grp)
+                                    #     eval_test_best= saved_model.evaluate([xtest,mtest], ytest_grp)
                                     # else: 
-                                    #     eval_val_best = saved_model.evaluate(xval, yvalgrp)
-                                    #     eval_train_best = saved_model.evaluate(xtrain, ytraingrp)
-                                    #     eval_test_best= saved_model.evaluate(xtest, ytestgrp)
+                                    #     eval_val_best = saved_model.evaluate(xval, yval_grp)
+                                    #     eval_train_best = saved_model.evaluate(xtrain, ytrain_grp)
+                                    #     eval_test_best= saved_model.evaluate(xtest, ytest_grp)
                                     
                                     if spp:
                                         predictionvalclass = np.argmax(saved_model.predict([xval,mval]),axis=1)      
@@ -934,7 +932,7 @@ if __name__ == "__main__":
 
                                     if loss == 'RankAndmse' or loss == 'RankAnddiscret' or loss == 'discret': 
                                         ppr = np.array([ppred / 365 for ppred in predictionval], dtype=np.int)
-                                        pYM = np.argmax(yvalgrp,axis = 1)
+                                        pYM = np.argmax(yval_grp,axis = 1)
                                         acc_val = accuracy_score(pYM,ppr)
                                         confB = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                         df_fft=pd.DataFrame(confB)
@@ -1025,14 +1023,14 @@ if __name__ == "__main__":
                                     yvalL=  uf.FromTimeToLong(yval,breaks)
                                     yvalT =  yval
                                     if loss == 'classif':
-                                        yvalgrp = dpr.YProcessing2(yval,nb_classes)
+                                        yval_grp = dpr.YProcessing2(yval,nb_classes)
                                     elif loss == 'triplet':
-                                        yvalgrp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.YProcessing2(yval,nb_classes),axis=1)]),axis=0))
+                                        yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.YProcessing2(yval,nb_classes),axis=1)]),axis=0))
                                     else:
-                                        yvalgrp = uf.YProcessing4(yval,'YEAR')
-                                        yvalgrpwc = uf.YProcessing4(yval,'YEARWC')
-                                        yvalgrp3 = uf.YProcessing4(yval,'THREE')
-                                        yvalgrpwc3 = uf.YProcessing4(yval,'THREEWC')
+                                        yval_grp = uf.YProcessing4(yval,'YEAR')
+                                        yval_grpwc = uf.YProcessing4(yval,'YEARWC')
+                                        yval_grp3 = uf.YProcessing4(yval,'THREE')
+                                        yval_grpwc3 = uf.YProcessing4(yval,'THREEWC')
                                     
                                     if loss =='discret'or loss=='RankAnddiscret':    
                                         ax=predictionShow('valgrp',yvalT,np.reshape(np.array(predictionval),(-1,1)),writer)
@@ -1047,18 +1045,18 @@ if __name__ == "__main__":
                             
                                     if loss == 'RankAndmse' or loss == 'RankAnddiscret' or loss == 'discret':
                                         #super Cindex avec censure
-                                        cindTrainSuper = uf.cindexT(np.argmax(ytraingrp,axis=1),predictiontrain,ytrain[:,0])
+                                        cind_trainSuper = uf.cindexT(np.argmax(ytrain_grp,axis=1),predictiontrain,ytrain[:,0])
                                         if p.use_test_set:
-                                            cindTestSuper = uf.cindexT(np.argmax(ytestgrp,axis=1),predictiontest,ytest[:,0])                                                                     
-                                        cindValSuper = uf.cindexT(np.argmax(yvalgrp,axis=1),np.reshape(np.array(predictionval),(-1,1)),yval[:,0]) 
+                                            cindTestSuper = uf.cindexT(np.argmax(ytest_grp,axis=1),predictiontest,ytest[:,0])                                                                     
+                                        cind_valSuper = uf.cindexT(np.argmax(yval_grp,axis=1),np.reshape(np.array(predictionval),(-1,1)),yval[:,0]) 
                                         
                                     else:
                                     
                                         #super Cindex avec censure
-                                        cindTrainSuper = uf.cindexR(np.argmax(ytraingrp,axis=1),predictiontrain,ytrain[:,0])
+                                        cind_trainSuper = uf.cindexR(np.argmax(ytrain_grp,axis=1),predictiontrain,ytrain[:,0])
                                         if p.use_test_set:
-                                            cindTestSuper = uf.cindexR(np.argmax(ytestgrp,axis=1),predictiontest,ytest[:,0])                                                                     
-                                        cindValSuper = uf.cindexR(np.argmax(yvalgrp,axis=1),np.array(predictionval),yval[:,0]) 
+                                            cindTestSuper = uf.cindexR(np.argmax(ytest_grp,axis=1),predictiontest,ytest[:,0])                                                                     
+                                        cind_valSuper = uf.cindexR(np.argmax(yval_grp,axis=1),np.array(predictionval),yval[:,0]) 
                                         
                 
                                     '''Evaluate with kaplan grp'''
@@ -1138,20 +1136,20 @@ if __name__ == "__main__":
                                             print('kaplan didn t work')
                                             pass
                                     if loss == 'RankAndmse' or loss == 'RankAnddiscret' or loss == 'discret':
-                                        cindexval1 = uf.cindexT(yval[:,1],np.array(predictionval),yval[:,0])
+                                        cindex_val1 = uf.cindexT(yval[:,1],np.array(predictionval),yval[:,0])
                                     else:
-                                        cindexval1 = uf.cindexR(yval[:,1],np.array(predictionval),yval[:,0])
+                                        cindex_val1 = uf.cindexR(yval[:,1],np.array(predictionval),yval[:,0])
                             
                                     if loss == 'RankAndmse' or loss == 'RankAnddiscret' or loss == 'discret':
                                         ppr = np.array([ppred / 365 for ppred in predictiontrain], dtype=np.int)
-                                        pYM = np.argmax(ytraingrp,axis = 1)
+                                        pYM = np.argmax(ytrain_grp,axis = 1)
                                         acc_train = accuracy_score(pYM,ppr)
                                         confB = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                         df_fft=pd.DataFrame(confB)
                                         df_fft.to_csv(os.path.join(file_name, f"{titleP}_confusion_train.csv"))
                                         
                                         ppr = np.array([ppred / 365 for ppred in predictionval], dtype=np.int)
-                                        pYM = np.argmax(yvalgrp,axis = 1)
+                                        pYM = np.argmax(yval_grp,axis = 1)
                                         acc_valgrp = accuracy_score(pYM,ppr)
                                         confB = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                         df_fft=pd.DataFrame(confB)
@@ -1159,17 +1157,17 @@ if __name__ == "__main__":
                                     if p.use_test_set:
                                         evalu = [tf.convert_to_tensor(['', 'train','val','test']) ,
                                                 tf.convert_to_tensor(['loss', str(eval_train_best[0]),str(eval_val_best[0]),str(eval_test_best[0])]),
-                                                tf.convert_to_tensor(['superCindex', str(cindTrainSuper),str(cindValSuper),str(cindTestSuper)]),
+                                                tf.convert_to_tensor(['superCindex', str(cind_trainSuper),str(cind_valSuper),str(cindTestSuper)]),
                                                 tf.convert_to_tensor(['tf_cindexR', str(eval_train_best[1]),str(eval_val_best[1]),str(eval_test_best[1])])]
                                     else:
                                         evalu = [tf.convert_to_tensor(['', 'train','val']) ,
                                                 tf.convert_to_tensor(['loss', str(eval_train_best[0]),str(eval_val_best[0])]),
-                                                tf.convert_to_tensor(['superCindex', str(cindTrainSuper),str(cindValSuper)]),
+                                                tf.convert_to_tensor(['superCindex', str(cind_trainSuper),str(cind_valSuper)]),
                                                 tf.convert_to_tensor(['Pval', str(PvalueTrain),str(PvalueVal)]),
                                                 tf.convert_to_tensor(['numG0', str(numG0_train),str(numG0_val)]),
                                                 tf.convert_to_tensor(['numG1', str(numG1_train),str(numG1_val)]),
                                                 tf.convert_to_tensor(['bestsep', str(bestsep),str(bestsep)]),
-                                                tf.convert_to_tensor(['tf_cindexR', str(eval_train_best[1]),str(cindexval1)])]
+                                                tf.convert_to_tensor(['tf_cindexR', str(eval_train_best[1]),str(cindex_val1)])]
                                     s = sess.run(tf.summary.text('EvalBest', tf.stack(evalu)))
                                     writer.add_summary(s)
                                     evalu = [tf.convert_to_tensor(['', 'train','val']) ,                        
@@ -1193,55 +1191,55 @@ if __name__ == "__main__":
                                     if loss == 'RankAndmse' or loss == 'RankAnddiscret' or loss == 'discret':
         
                                         [cindex0,cindex1,cindex2,cindex3,cindex4,cindex5,cindex6] = lss.time_cindex(ytrain[:,1],predictiontrain,ytrain[:,0],cla='classe',order='T')
-                                        [cindexVal0,cindexVal1,cindexVal2,cindexVal3,cindexVal4,cindexVal5,cindexVal6] = lss.time_cindex(yval[:,1],np.array(predictionval),yval[:,0],cla='classe',order='T')
+                                        [cindex_val0,cindex_val1,cindex_val2,cindex_val3,cindex_val4,cindex_val5,cindex_val6] = lss.time_cindex(yval[:,1],np.array(predictionval),yval[:,0],cla='classe',order='T')
                                     else:
                                         [cindex0,cindex1,cindex2,cindex3,cindex4,cindex5,cindex6] = lss.time_cindex(ytrain[:,1],predictiontrain,ytrain[:,0],cla='classe',order='R')
-                                        [cindexVal0,cindexVal1,cindexVal2,cindexVal3,cindexVal4,cindexVal5,cindexVal6] = lss.time_cindex(yval[:,1],np.array(predictionval),yval[:,0],cla='classe',order='R')
+                                        [cindex_val0,cindex_val1,cindex_val2,cindex_val3,cindex_val4,cindex_val5,cindex_val6] = lss.time_cindex(yval[:,1],np.array(predictionval),yval[:,0],cla='classe',order='R')
                                 
                                     if p.use_test_set:
-                                        [cindexTest0,cindexTest1,cindexTest2,cindexTest3,cindexTest4,cindexTest5,cindexTest6] = lss.time_cindex(ytest[:,1],predictiontest,ytest[:,0],cla='classe')
+                                        [cindex_test0,cindex_test1,cindex_test2,cindex_test3,cindex_test4,cindex_test5,cindex_test6] = lss.time_cindex(ytest[:,1],predictiontest,ytest[:,0],cla='classe')
                                                                     
                                     
                                     if p.use_test_set:
                                         evalu = [tf.convert_to_tensor(['', 'train','val','test']) ,
-                                                tf.convert_to_tensor(['cindex_0', str(cindex0) ,str(cindexVal0),str(cindexTest0)]),
-                                                tf.convert_to_tensor(['cindex_1', str(cindex1) ,str(cindexVal1),str(cindexTest1)]),
-                                                tf.convert_to_tensor(['cindex_2', str(cindex2) ,str(cindexVal2),str(cindexTest2)]),
-                                                tf.convert_to_tensor(['cindex_3', str(cindex3) ,str(cindexVal3),str(cindexTest3)]),
-                                                tf.convert_to_tensor(['cindex_4', str(cindex4) ,str(cindexVal4),str(cindexTest4)]),
-                                                tf.convert_to_tensor(['cindex_5', str(cindex5) ,str(cindexVal5),str(cindexTest5)]),
-                                                tf.convert_to_tensor(['cindex_6', str(cindex6) ,str(cindexVal6),str(cindexTest6)])]
+                                                tf.convert_to_tensor(['cindex_0', str(cindex0) ,str(cindex_val0),str(cindex_test0)]),
+                                                tf.convert_to_tensor(['cindex_1', str(cindex1) ,str(cindex_val1),str(cindex_test1)]),
+                                                tf.convert_to_tensor(['cindex_2', str(cindex2) ,str(cindex_val2),str(cindex_test2)]),
+                                                tf.convert_to_tensor(['cindex_3', str(cindex3) ,str(cindex_val3),str(cindex_test3)]),
+                                                tf.convert_to_tensor(['cindex_4', str(cindex4) ,str(cindex_val4),str(cindex_test4)]),
+                                                tf.convert_to_tensor(['cindex_5', str(cindex5) ,str(cindex_val5),str(cindex_test5)]),
+                                                tf.convert_to_tensor(['cindex_6', str(cindex6) ,str(cindex_val6),str(cindex_test6)])]
                                     else:
                                         evalu = [tf.convert_to_tensor(['', 'train','val']) ,
-                                                tf.convert_to_tensor(['cindex_0', str(cindex0) ,str(cindexVal0)]),
-                                                tf.convert_to_tensor(['cindex_1', str(cindex1) ,str(cindexVal1)]),
-                                                tf.convert_to_tensor(['cindex_2', str(cindex2) ,str(cindexVal2)]),
-                                                tf.convert_to_tensor(['cindex_3', str(cindex3) ,str(cindexVal3)]),
-                                                tf.convert_to_tensor(['cindex_4', str(cindex4) ,str(cindexVal4)]),
-                                                tf.convert_to_tensor(['cindex_5', str(cindex5) ,str(cindexVal5)]),
-                                                tf.convert_to_tensor(['cindex_6', str(cindex6) ,str(cindexVal6)])]
+                                                tf.convert_to_tensor(['cindex_0', str(cindex0) ,str(cindex_val0)]),
+                                                tf.convert_to_tensor(['cindex_1', str(cindex1) ,str(cindex_val1)]),
+                                                tf.convert_to_tensor(['cindex_2', str(cindex2) ,str(cindex_val2)]),
+                                                tf.convert_to_tensor(['cindex_3', str(cindex3) ,str(cindex_val3)]),
+                                                tf.convert_to_tensor(['cindex_4', str(cindex4) ,str(cindex_val4)]),
+                                                tf.convert_to_tensor(['cindex_5', str(cindex5) ,str(cindex_val5)]),
+                                                tf.convert_to_tensor(['cindex_6', str(cindex6) ,str(cindex_val6)])]
                                     s = sess.run(tf.summary.text('EvalBestParTemps_7classes', tf.stack(evalu)))
                                     writer.add_summary(s)
                                     
                                     if loss == 'RankAndmse' or loss == 'RankAnddiscret' or loss == 'discret':
             
                                         [cindex0,cindex1] = lss.time_cindex(ytrain[:,1],predictiontrain,ytrain[:,0],cla='0ouAutre',order='T')
-                                        [cindexVal0,cindexVal1] = lss.time_cindex(yval[:,1],predictionval,yval[:,0],cla='0ouAutre',order='T')
+                                        [cindex_val0,cindex_val1] = lss.time_cindex(yval[:,1],predictionval,yval[:,0],cla='0ouAutre',order='T')
                                     else:
                                         [cindex0,cindex1] = lss.time_cindex(ytrain[:,1],predictiontrain,ytrain[:,0],cla='0ouAutre',order='R')
-                                        [cindexVal0,cindexVal1] = lss.time_cindex(yval[:,1],predictionval,yval[:,0],cla='0ouAutre',order='R')
+                                        [cindex_val0,cindex_val1] = lss.time_cindex(yval[:,1],predictionval,yval[:,0],cla='0ouAutre',order='R')
                                                                     
                                     if p.use_test_set:
-                                        [cindexTest0,cindexTest1] = lss.time_cindex(ytest[:,1],predictiontest,ytest[:,0],cla='0ouAutre')
+                                        [cindex_test0,cindex_test1] = lss.time_cindex(ytest[:,1],predictiontest,ytest[:,0],cla='0ouAutre')
 
                                     if p.use_test_set:
                                         evalu = [tf.convert_to_tensor(['', 'train','val','test']) ,
-                                                tf.convert_to_tensor(['cindex_0', str(cindex0) ,str(cindexVal0),str(cindexTest0)]),
-                                                tf.convert_to_tensor(['cindex_1', str(cindex1) ,str(cindexVal1),str(cindexTest1)])]
+                                                tf.convert_to_tensor(['cindex_0', str(cindex0) ,str(cindex_val0),str(cindex_test0)]),
+                                                tf.convert_to_tensor(['cindex_1', str(cindex1) ,str(cindex_val1),str(cindex_test1)])]
                                     else:
                                         evalu = [tf.convert_to_tensor(['', 'train','val']) ,
-                                                tf.convert_to_tensor(['cindex_0', str(cindex0) ,str(cindexVal0)]),
-                                                tf.convert_to_tensor(['cindex_1', str(cindex1) ,str(cindexVal1)])]
+                                                tf.convert_to_tensor(['cindex_0', str(cindex0) ,str(cindex_val0)]),
+                                                tf.convert_to_tensor(['cindex_1', str(cindex1) ,str(cindex_val1)])]
                                     s = sess.run(tf.summary.text('EvalBestParTemps_0ouAutre', tf.stack(evalu)))
                                     writer.add_summary(s) 
                                         
@@ -1435,14 +1433,14 @@ if __name__ == "__main__":
                                                 im.paste(pat,(begx+10,0))
                                                 
                                                 #feat
-                                                aaa =np.array(featuresMap[patientn,:,:,fi]) 
-                                                aaa = cv2.resize(aaa, dsize=(36, 36), interpolation=cv2.INTER_CUBIC)
-                                                a_scaled = 255*(aaa-np.min(aaa))/(np.max(aaa)-np.min(aaa))
+                                                list_mode =np.array(featuresMap[patientn,:,:,fi]) 
+                                                list_mode = cv2.resize(list_mode, dsize=(36, 36), interpolation=cv2.INTER_CUBIC)
+                                                a_scaled = 255*(list_mode-np.min(list_mode))/(np.max(list_mode)-np.min(list_mode))
                                                 im.paste(Image.fromarray(a_scaled),(begx,begy))
                                                 
                                                 #image
-                                                aaa =np.array(xtrain[patientn,:,:,0]) 
-                                                a_scaled = 255*(aaa-np.min(aaa))/(np.max(aaa)-np.min(aaa))
+                                                list_mode =np.array(xtrain[patientn,:,:,0]) 
+                                                a_scaled = 255*(list_mode-np.min(list_mode))/(np.max(list_mode)-np.min(list_mode))
                                                 im.paste(Image.fromarray(a_scaled),(begx+38,begy))
                                                 
                                                 begy=begy + 50
@@ -1470,14 +1468,14 @@ if __name__ == "__main__":
                                                 im.paste(pat,(begx+10,0))
                                                 
                                                 #feat
-                                                aaa =np.array(featuresMap[patientn,:,:,fi]) 
-                                                aaa = cv2.resize(aaa, dsize=(36, 36), interpolation=cv2.INTER_CUBIC)
-                                                a_scaled = 255*(aaa-np.min(aaa))/(np.max(aaa)-np.min(aaa))
+                                                list_mode =np.array(featuresMap[patientn,:,:,fi]) 
+                                                list_mode = cv2.resize(list_mode, dsize=(36, 36), interpolation=cv2.INTER_CUBIC)
+                                                a_scaled = 255*(list_mode-np.min(list_mode))/(np.max(list_mode)-np.min(list_mode))
                                                 im.paste(Image.fromarray(a_scaled),(begx,begy))
                                                 
                                                 #image
-                                                aaa =np.array(xtrain[patientn,:,:,0]) 
-                                                a_scaled = 255*(aaa-np.min(aaa))/(np.max(aaa)-np.min(aaa))
+                                                list_mode =np.array(xtrain[patientn,:,:,0]) 
+                                                a_scaled = 255*(list_mode-np.min(list_mode))/(np.max(list_mode)-np.min(list_mode))
                                                 im.paste(Image.fromarray(a_scaled),(begx+38,begy))
                                                 
                                                 begy=begy + 50
@@ -1493,52 +1491,52 @@ if __name__ == "__main__":
                                     if loss != 'discret' and loss!='RankAnddiscret':
                                         if metrics == 'triplet':
                                             
-                                            cindTrain = uf.cindexR(ytrain[:,1],predictiontrainclass,ytrain[:,0])
+                                            cind_train = uf.cindexR(ytrain[:,1],predictiontrainclass,ytrain[:,0])
                                             
                                             
                                             if p.use_test_set :
                                                 cindTest = uf.cindexR(ytest[:,1],predictiontestclass,ytest[:,0])
-                                            cindVal = uf.cindexR(yval[:,1],np.array(predictionvalclass),yval[:,0]) 
+                                            cind_val = uf.cindexR(yval[:,1],np.array(predictionvalclass),yval[:,0]) 
                                             
-                                            [cindexTrain1,cindexTrain2,cindexTrain3] = lss.time_cindex(ytrain[:,1],predictiontrainclass,ytrain[:,0])
+                                            [cindex_train1,cindex_train2,cindex_train3] = lss.time_cindex(ytrain[:,1],predictiontrainclass,ytrain[:,0])
                                             
                                             if p.use_test_set :
-                                                [cindexTest1,cindexTest2,cindexTest3] = lss.time_cindex(ytest[:,1],predictiontestclass,ytest[:,0])
-                                            [cindexVal1,cindexVal2,cindexVal3] = lss.time_cindex(yval[:,1],predictionvalclass,yval[:,0])
+                                                [cindex_test1,cindex_test2,cindex_test3] = lss.time_cindex(ytest[:,1],predictiontestclass,ytest[:,0])
+                                            [cindex_val1,cindex_val2,cindex_val3] = lss.time_cindex(yval[:,1],predictionvalclass,yval[:,0])
                     
                                         
                                         else:
                                                 
-                                            cindTrain = uf.cindexR(ytrain[:,1],predictiontrain,ytrain[:,0])
+                                            cind_train = uf.cindexR(ytrain[:,1],predictiontrain,ytrain[:,0])
                                             
                                             if p.use_test_set:
                                                 cindTest = uf.cindexR(ytest[:,1],predictiontest,ytest[:,0])
                                             print(np.shape(predictionval),np.shape(yval))
-                                            cindVal = uf.cindexR(yval[:,1],np.array(predictionval),yval[:,0]) 
+                                            cind_val = uf.cindexR(yval[:,1],np.array(predictionval),yval[:,0]) 
                                             
-                                            [cindexTrain1,cindexTrain2,cindexTrain3] = lss.time_cindex(ytrain[:,1],predictiontrain,ytrain[:,0])
+                                            [cindex_train1,cindex_train2,cindex_train3] = lss.time_cindex(ytrain[:,1],predictiontrain,ytrain[:,0])
                                             
                                             if p.use_test_set:
-                                                [cindexTest1,cindexTest2,cindexTest3] = lss.time_cindex(ytest[:,1],predictiontest,ytest[:,0])
-                                            [cindexVal1,cindexVal2,cindexVal3] = lss.time_cindex(yval[:,1],predictionval,yval[:,0])
+                                                [cindex_test1,cindex_test2,cindex_test3] = lss.time_cindex(ytest[:,1],predictiontest,ytest[:,0])
+                                            [cindex_val1,cindex_val2,cindex_val3] = lss.time_cindex(yval[:,1],predictionval,yval[:,0])
                                         
                                             [cindex0,cindex1,cindex2,cindex3,cindex4,cindex5,cindex6] = lss.time_cindex(ytrain[:,1],predictiontrain,ytrain[:,0],cla='classe')
                                             [cindex0,cindex1] = lss.time_cindex(ytrain[:,1],predictiontrain,ytrain[:,0],cla='0ouAutre')
                                             
-                                            [cindexVal0,cindexVal1,cindexVal2,cindexVal3,cindexVal4,cindexVal5,cindexVal6] = lss.time_cindex(yval[:,1],predictionval,yval[:,0],cla='classe')
-                                            [cindexVal0,cindexVal1] = lss.time_cindex(yval[:,1],predictionval,yval[:,0],cla='0ouAutre')
+                                            [cindex_val0,cindex_val1,cindex_val2,cindex_val3,cindex_val4,cindex_val5,cindex_val6] = lss.time_cindex(yval[:,1],predictionval,yval[:,0],cla='classe')
+                                            [cindex_val0,cindex_val1] = lss.time_cindex(yval[:,1],predictionval,yval[:,0],cla='0ouAutre')
 
 
                                     else:
-                                        cindTrain = uf.cindexT(ytrainT[:,1],predictiontrain,ytrainT[:,0])
+                                        cind_train = uf.cindexT(ytrainT[:,1],predictiontrain,ytrainT[:,0])
                                         
                                         if p.use_test_set:   
                                             cindTest = uf.cindexT(ytestT[:,1],predictiontest,ytestT[:,0])
-                                        cindVal = uf.cindexT(yvalT[:,1],np.array(predictionval),yvalT[:,0]) 
+                                        cind_val = uf.cindexT(yvalT[:,1],np.array(predictionval),yvalT[:,0]) 
                                         
-                                        # [cindexTrain1,cindexTrain2,cindexTrain3] = lss.time_cindex(uf.FromLongToTime(ytrain,n_intervals,None)[0],predictiontrain,uf.FromLongToTime(ytrain,n_intervals,None)[1],'T')
-                                        # [cindexTest1,cindexTest2,cindexTest3] = lss.time_cindex(uf.FromLongToTime(ytest,n_intervals,None)[0],predictiontest,uf.FromLongToTime(ytest,n_intervals,None)[1],'T')
-                                        # [cindexVal1,cindexVal2,cindexVal3] = lss.time_cindex(uf.FromLongToTime(yval,n_intervals,None)[0],predictionval,uf.FromLongToTime(yval,n_intervals,None)[1],'T')
+                                        # [cindex_train1,cindex_train2,cindex_train3] = lss.time_cindex(uf.FromLongToTime(ytrain,n_intervals,None)[0],predictiontrain,uf.FromLongToTime(ytrain,n_intervals,None)[1],'T')
+                                        # [cindex_test1,cindex_test2,cindex_test3] = lss.time_cindex(uf.FromLongToTime(ytest,n_intervals,None)[0],predictiontest,uf.FromLongToTime(ytest,n_intervals,None)[1],'T')
+                                        # [cindex_val1,cindex_val2,cindex_val3] = lss.time_cindex(uf.FromLongToTime(yval,n_intervals,None)[0],predictionval,uf.FromLongToTime(yval,n_intervals,None)[1],'T')
                                     
                                 # if loss != 'classif' and loss != 'triplet'  and loss != 'discret':
                                 #     pathSavepredTr = os.path.join(file_name, f"{titleP}_ped_train")
@@ -1602,18 +1600,18 @@ if __name__ == "__main__":
                                 #     pathSavepredTr = os.path.join(file_name, f"{titleP}_ped_class_train")
                                 #     np.save(pathSavepredTr,predictiontrainclass)
                                 #     pathSavetrueTr = os.path.join(file_name, f"{titleP}_true_class_train")
-                                #     np.save(pathSavetrueTr,ytraingrp)
+                                #     np.save(pathSavetrueTr,ytrain_grp)
                                                 
                                 #     pathSavepredTr = os.path.join(file_name, f"{titleP}_ped_class_val")
                                 #     np.save(pathSavepredTr,predictionvalclass)
                                 #     pathSavetrueTr = os.path.join(file_name, f"{titleP}_true_class_val")
-                                #     np.save(pathSavetrueTr,yvalgrp)
+                                #     np.save(pathSavetrueTr,yval_grp)
                                     
                                 #     if p.use_test_set:
                                 #         pathSavepredTr = os.path.join(file_name, f"{titleP}_ped_class_test")
                                 #         np.save(pathSavepredTr,predictionBeforeclass)
                                 #         pathSavetrueTr = os.path.join(file_name, f"{titleP}_true_class_test")
-                                #         np.save(pathSavetrueTr,ytestgrp)
+                                #         np.save(pathSavetrueTr,ytest_grp)
                                                
                                 # pred.save_weights(best_model_file)
                                 #results = dpr.saving(fitting,titleP,eval_train, eval_val,None,file_name,metrics)
@@ -1623,21 +1621,21 @@ if __name__ == "__main__":
                                     
                                     if p.use_test_set:
                                         ppr = predictionBeforeclass
-                                        pYM = np.argmax(ytestgrp,axis = 1)
+                                        pYM = np.argmax(ytest_grp,axis = 1)
                                         resu1 = accuracy_score(pYM,ppr)
                                         print('acc test',resu1)
                                         confA = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                         np.save(os.path.join(file_name, f"{titleP}confusion_test.npy"),confA)
                                     
                                     ppr = predictiontrainclass
-                                    pYM = np.argmax(ytraingrp,axis = 1)
+                                    pYM = np.argmax(ytrain_grp,axis = 1)
                                     resu2 = accuracy_score(pYM,ppr)
                                     print('acc train',resu2)
                                     confB = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
                                     np.save(os.path.join(file_name, f"{titleP}confusion_after_train.npy"),confB)
                                     
                                     ppr = predictionvalclass
-                                    pYM = np.argmax(yvalgrp,axis = 1)
+                                    pYM = np.argmax(yval_grp,axis = 1)
                                     resu3 = accuracy_score(pYM,ppr)
                                     print('acc validation',resu3)
                                     confC = sklearn.metrics.confusion_matrix(pYM, ppr, labels=None, sample_weight=None)
@@ -1647,15 +1645,15 @@ if __name__ == "__main__":
             
                                 if p.cross_validation :
                                     if p.use_test_set:
-                                        fullRow=[f'CV{CV}_K{k}',eval_train_best[1],cindexval1,eval_test_best[1]]
+                                        full_row=[f'CV{CV}_K{k}',eval_train_best[1],cindex_val1,eval_test_best[1]]
                                     else:
-                                        fullRow=[f'CV{}_K{}',eval_train_best[1],cindexval1]
+                                        full_row=[f'CV{CV}_K{k}',eval_train_best[1],cindex_val1]
         
                                     for key, value in param.iteritems():
                                         print(key)
                                         temp = value[0]
-                                        fullRow.append(temp)
-                                    fullcv.append(fullRow)
+                                        full_row.append(temp)
+                                    cv_full.append(full_row)
                                     if p.use_test_set:
                                         npa =['CV_K','best_train_cindex','best_val_cindex','best_test_cindex']
                                     else:                                
@@ -1665,19 +1663,19 @@ if __name__ == "__main__":
                                         temp = key
                                         npa.append(temp)
                                     path_full_df =  os.path.join(intermediate_folder, f'FullCV_{CV}.csv')
-                                    fullDF=pd.DataFrame(fullcv,columns = npa)
-                                    fullDF.to_csv(path_full_df)
+                                    df_full=pd.DataFrame(cv_full,columns = npa)
+                                    df_full.to_csv(path_full_df)
             
                                     # loss_train.append(eval_train[0])
                                     # if loss != 'classif' :
-                                    CindexTrain.append(cindTrain)
+                                    cindex_train.append(cind_train)
                                     # else:
-                                        # CindexTrain.append(0)
-                                    # LossVal.append(eval_val[0])
+                                        # cindex_train.append(0)
+                                    # loss_valid.append(eval_val[0])
                                     # if loss != 'classif':
-                                    CindexVal.append(cindVal)
+                                    cindex_val.append(cind_val)
                                     # else:
-                                    #     CindexVal.append(0)
+                                    #     cindex_val.append(0)
                                     if loss != 'classif' and loss != 'coxAndclassif' and loss!='triplet':
                                         AcurracyTrain.append(0)
                                         AcurracyVal.append(0)
@@ -1690,19 +1688,19 @@ if __name__ == "__main__":
                                         AcurracyVal.append(resu3)
                                     if loss == 'cox' or loss == 'discret' :   
                                         train_best.append(eval_train_best[1])
-                                        val_best.append(cindexval1)
+                                        val_best.append(cindex_val1)
                                     else:
                                         train_best.append(eval_train_best[2])
-                                        val_best.append(cindexval1)
+                                        val_best.append(cindex_val1)
                                         
                                 
                         """ FIN K loop """
                     if p.cross_validation:
                         if not p.pretrain :
-                            fullDF = pd.read_csv(path_full_df, encoding='utf-8')
-                            pathCSV_mofDF =   os.path.join(intermediate_folder, f'MeanOverFoldCV_{str(CV)}.csv')
-                            if os.path.exists(pathCSV_mofDF):
-                                mofcv = pd.read_csv(pathCSV_mofDF, encoding='utf-8')
+                            df_full = pd.read_csv(path_full_df, encoding='utf-8')
+                            path_csv_mean_over_fold =   os.path.join(intermediate_folder, f'MeanOverFoldCV_{str(CV)}.csv')
+                            if os.path.exists(path_csv_mean_over_fold):
+                                mofcv = pd.read_csv(path_csv_mean_over_fold, encoding='utf-8')
                                 mofcv = mofcv.iloc[:,1:].values.tolist()
                             else:
                                 mofcv = []
@@ -1713,25 +1711,25 @@ if __name__ == "__main__":
         
                             numi=0
                             for k in range(len(X)):
-                                kDF = fullDF[fullDF['CV_K'] == f'CV{str(CV)}_K{str(k)}']
-                                listeMode={'loss':list(set(kDF['loss'])),'D3':list(set(kDF['D3'])),'spp':list(set(kDF['spp'])),'attention':list(set(kDF['attention'])),'pretrain':list(set(kDF['pretrain'])),'npatch':list(set(kDF['npatch']))}
-                                gridMode = ParameterGrid(listeMode)
+                                kDF = df_full[df_full['CV_K'] == f'CV{str(CV)}_K{str(k)}']
+                                dict_mode={'loss':list(set(kDF['loss'])),'D3':list(set(kDF['D3'])),'spp':list(set(kDF['spp'])),'attention':list(set(kDF['attention'])),'pretrain':list(set(kDF['pretrain'])),'npatch':list(set(kDF['npatch']))}
+                                gridMode = ParameterGrid(dict_mode)
                                 for pM in gridMode:
                                     try:
-                                        l= fullDF['loss']==pM['loss']
-                                        d= fullDF['D3']==pM['D3']
-                                        s= fullDF['spp']==pM['spp']
-                                        a= fullDF['attention']==pM['attention']
-                                        pr= fullDF['pretrain']==pM['pretrain']
-                                        npp= fullDF['npatch']==pM['npatch']
-                                        aaa=kDF[l & d & s & a & pr & npp]
-                                        indM=np.where(aaa['best_val_cindex']==np.max(aaa['best_val_cindex']))
+                                        l= df_full['loss']==pM['loss']
+                                        d= df_full['D3']==pM['D3']
+                                        s= df_full['spp']==pM['spp']
+                                        a= df_full['attention']==pM['attention']
+                                        pr= df_full['pretrain']==pM['pretrain']
+                                        npp= df_full['npatch']==pM['npatch']
+                                        list_mode=kDF[l & d & s & a & pr & npp]
+                                        indM=np.where(list_mode['best_val_cindex']==np.max(list_mode['best_val_cindex']))
                                         
                                         if numi==0:
-                                            mofcv=aaa.iloc[indM[0],1:]
+                                            mofcv=list_mode.iloc[indM[0],1:]
                                         else:
-                                            mofcv=pd.concat([mofcv,aaa.iloc[indM[0],1:]])
+                                            mofcv=pd.concat([mofcv,list_mode.iloc[indM[0],1:]])
                                         numi+=1
                                     except:
                                         pass
-                            mofcv.to_csv(pathCSV_mofDF) 
+                            mofcv.to_csv(path_csv_mean_over_fold) 
