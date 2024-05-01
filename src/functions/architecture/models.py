@@ -120,7 +120,7 @@ def PrepDataCrossVal(RR,PATH,change=False,interpolSize=36,reload=True,classes='s
 
   
 def conv_netFirst(size,D3=False,spp=True,maxi=False):
-    if D3!=True: 
+    if not D3: 
         if D3=='25':
             Third = 3
         else:
@@ -336,8 +336,7 @@ def Prep25(x,m,y,r):
     return x2, m2,y,r
 
 def PrepData(rtrain, rtest, rval,PATH,change=False,interpolSize=36,reload=True,classes='surv',D3=False,method='all',dataAug=0,npatch=9):
-    
-    
+        
     data, liste_patches, liste_ref, liste_patients,errors,liste_mask = pf.patchP(PATH,reload,interpolSize,method,D3,npatch)
     y_grp = pf.YProcessing(data,liste_patients,classes)
     xtrain, reftr, xtest, refte , xval, refv, mtrain, mtest, mval =[],[],[],[],[],[],[],[],[]
