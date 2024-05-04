@@ -47,7 +47,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     #path arguments
     parser.add_argument("--training-dir", type=Path, help="name of the training folder", default = 'avecspatial')
-    parser.add_argument("--save-dir", type=Path, help="name of the experiement folder", default = './Results/ModeFinalRunVal/' )
+    parser.add_argument("--save-dir", type=Path, help="name of the experiement folder", default = os.path.join('Results','ModeFinalRunVal' ))
 
     parser.add_argument("--cross-validation",  action=bool, help="If True do cross validation, otherwise train/validation/test.", choices=[True,False], default = True)
     parser.add_argument("--ratio-binary-pretraining", type=int, help="Ratio for binary pretraining.", default=50)
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         #         mean= np.mean(y[:,1])
         #         med = np.median(y[:,1])
         #         tauxCensor = (1 - np.mean(y[:,0]))*100
-        #         print("{}:    Censorship {}%, mean time {}, median time {}".format(name,tauxCensor,mean,med))
+        #         print(f"{name}:    Censorship {tauxCensor}%, mean time {mean}, median time {med}")
         #     stat(ytrainsurv,'train')
         #     stat(yvalsurv,'val')
         #     stat(ytestsurv,'test')
@@ -126,8 +126,8 @@ if __name__ == "__main__":
         #         mean = np.mean(y[:,1])
         #         med = np.median(y[:,1])
         #         tauxCensor = 100- (np.mean(y[:,0])*100)
-        #         print("{}:    Censorship {}%, mean time {}, median time {}".format(name,tauxCensor,mean,med))
-        #     for k in range(len(RR)):
+        #         print(f"{name}:    Censorship {tauxCensor}%, mean time {mean}, median time {med}")
+        #     for k in range(len(list_pat_ref)):
         #         stat(Ysurv[k],str(k))
                 
         
@@ -157,14 +157,14 @@ if __name__ == "__main__":
         if p.pretrain :
             """ ******************** BINARY DATA *********************************"""
             if not p.cross_validation :
-                xbitrain2D, ybitrain2D, xbival2D, ybival2D = ptg.binary_extraction(RR, p.cross_validation, path_data, sess, TEST=False, p.interpolation_size)
+                xbitrain2D, ybitrain2D, xbival2D, ybival2D = ptg.binary_extraction(list_pat_ref, p.cross_validation, path_data, sess, TEST=False, p.interpolation_size)
             else:
-                Xb2D, Yb2D, Xb3D, Yb3D = ptg.binary_extraction(RR,p.cross_validation,path_data,sess,TEST=False, p.interpolation_size)
+                Xb2D, Yb2D, Xb3D, Yb3D = ptg.binary_extraction(list_pat_ref,p.cross_validation,path_data,sess,TEST=False, p.interpolation_size)
         
         breaks=np.arange(0.,365*7,p.stride)
         
         if p.pretrain:
-            parameters = {'Maxi':[False], 'SPP':['False'], 'D3':[True],
+            parameters = {'Maxi':[False], 'SPP':['False'], 'D3':['True'],
                             'Loss':['cox'],'pretrain':['binary'] ,  #,'textureP','textureF', 'binaryP','binaryF'
                             'LR Pretrain':[1e-04], 'LR Finetune': [1e-04],  'rate' : [0.83] , 
                             'Lrate_decay_learningP' :[1e-07],
@@ -172,7 +172,7 @@ if __name__ == "__main__":
                             'epoch Finetune': [40] , 'batch size': [10], 'image size':[36],
                             'noTrainLayer': [0] ,'npatch':[3],'dataAug':[15],'attention':['s'],'nb_classes':[7]}
         else:
-            parameters = {'Maxi':[False], 'SPP':['False'], 'D3':[True],
+            parameters = {'Maxi':[False], 'SPP':['False'], 'D3':['True'],
                             'Loss':['cox'],'pretrain':['binary'] ,  #,'textureP','textureF', 'binaryP','binaryF'
                             'LR Pretrain':[1e-04], 'LR Finetune': [1e-04],  'rate' : [0.83,0.17,0.5] , 
                             'Lrate_decay_learningP' :[1e-07],
@@ -231,18 +231,18 @@ if __name__ == "__main__":
                 if not p.pretrain :
                     if not p.cross_validation :
                         if loss=='discret' or loss == 'RankAnddiscret':
-                            xtrain,mtrain,ytrain,xval,mval,yval,xtest,mtest,ytest, ytrainT,yvalT,ytestT, rtrain, rtest,rval = dataprep.extract_dataIm(p.cross_validation,liste_ref,path_patients,path_data,sess,cl,distribution,p.interpolation_size,RR,p.reload_inputs,spp,npatch,D3,loss)
+                            xtrain,mtrain,ytrain,xval,mval,yval,xtest,mtest,ytest, ytrainT,yvalT,ytestT, rtrain, rtest,rval = dataprep.extract_dataIm(p.cross_validation,liste_ref,path_patients,path_data,sess,cl,distribution,p.interpolation_size,list_pat_ref,p.reload_inputs,spp,npatch,D3,loss)
                         else :
-                            xtrain,mtrain,ytrain,xval,mval,yval,xtest,mtest,ytest , rtrain, rtest,rval = dataprep.extract_dataIm(p.cross_validation,liste_ref,path_patients,path_data,sess,cl,distribution,p.interpolation_size,RR,p.reload_inputs,spp,npatch,D3,loss)
+                            xtrain,mtrain,ytrain,xval,mval,yval,xtest,mtest,ytest , rtrain, rtest,rval = dataprep.extract_dataIm(p.cross_validation,liste_ref,path_patients,path_data,sess,cl,distribution,p.interpolation_size,list_pat_ref,p.reload_inputs,spp,npatch,D3,loss)
                     else: 
-                        Xt,Yt,Mt,Rt, RR = dataprep.extract_dataIm(p.cross_validation,liste_ref,path_patients,path_data,sess,cl,distribution,p.interpolation_size,RR,p.reload_inputs,spp,npatch,D3,loss)
+                        Xt,Yt,Mt,Rt, list_pat_ref = dataprep.extract_dataIm(p.cross_validation,liste_ref,path_patients,path_data,sess,cl,distribution,p.interpolation_size,list_pat_ref,p.reload_inputs,spp,npatch,D3,loss)
                     
                     loss_train, loss_valid, AcurracyTrain, AcurracyVal, cindex_train,cindex_val,train_best, val_best =[],[],[],[],[],[],[],[]
                     
                 if not p.cross_validation :
                     cv_number = 1
                 else:
-                    cv_number = len(RR)
+                    cv_number = len(list_pat_ref)
                     
                 if p.use_test_set :
                     cv_number = 1
@@ -293,7 +293,7 @@ if __name__ == "__main__":
                             
                         else:
                             if p.use_test_set:
-                                if D3 :
+                                if D3=='True' :
                                     Xb=[Xb3D[1],Xb3D[2],Xb3D[3],Xb3D[4]]
                                     Yb=[Yb3D[1],Yb3D[2],Yb3D[3],Yb3D[4]]
                                     # Xb, Yb= np.delete(Xb3D,CV), np.delete(Yb3D,CV)
@@ -301,7 +301,7 @@ if __name__ == "__main__":
                                     Xb=[Xb2D[1],Xb2D[2],Xb2D[3],Xb2D[4]]
                                     Yb=[Yb2D[1],Yb2D[2],Yb2D[3],Yb2D[4]]
                             else:
-                                if D3 :
+                                if D3=='True' :
                                     Xb=[Xb3D[0],Xb3D[1],Xb3D[2],Xb3D[3]]
                                     Yb=[Yb3D[0],Yb3D[1],Yb3D[2],Yb3D[3]]
                                     # Xb, Yb= np.delete(Xb3D,CV), np.delete(Yb3D,CV)
@@ -311,9 +311,9 @@ if __name__ == "__main__":
                     if not p.cross_validation :
                         KNum = 1
                     else:
-                        KNum = len(RR)-1
+                        KNum = len(list_pat_ref)-1
                     if not p.use_test_set:
-                        KNum = len(RR)
+                        KNum = len(list_pat_ref)
 
                     for k in range(KNum):
                     
@@ -359,7 +359,7 @@ if __name__ == "__main__":
                             sess = tf.Session()
                             print(f'****** run {gh} on {len(grid)} *******************')
                             print('***************************************') 
-                            print('****** lin {} *******************'.format(lin))
+                            print(f'****** lin {lin} *******************')
                             path_full_df = os.path.join(intermediate_folder,f'FullCV_{CV}.csv')
                             
                             if os.path.exists(path_full_df):
@@ -469,7 +469,7 @@ if __name__ == "__main__":
                                         ytrain=np.concatenate((ytrain[0],ytrain[1],ytrain[2],ytrain[3]))
                                         rtrain=np.concatenate((rtrain[0],rtrain[1],rtrain[2],rtrain[3]))
                                     if data_augm_size!=0:
-                                        if not D3 :#or D3=='25'
+                                        if D3 == 'False':#or D3=='25'
                                             xtrain,ytrain,mtrain,rtrain=dataprep.dataAugmentation(augmentation_config,xtrain,ytrain,mtrain,rtrain,D3=D3,num =data_augm_size)
                                             xval,yval,mval,rval=dataprep.dataAugmentation(augmentation_config,xval,yval,mval,rval, D3=D3,num =data_augm_size)
                                         else:
@@ -483,7 +483,7 @@ if __name__ == "__main__":
 
                                 else:
                                     if data_augm_size!=0:
-                                        if not D3 :#or D3=='25'
+                                        if D3 == 'False' :#or D3=='25'
                                             xtrain,ytrain,mtrain=dataprep.dataAugmentation(augmentation_config,xtrain,ytrain,mtrain,D3=D3,num=data_augm_size)
                                             xval,yval,mval=dataprep.dataAugmentation(augmentation_config,xval,yval,mval,D3=D3,num =data_augm_size)
                                             #xtest,ytest,mtest=dataprep.dataAugmentation(augmentation_config,xtest,ytest,mtest,D3=D3,num =data_augm_size)
@@ -510,36 +510,36 @@ if __name__ == "__main__":
                                     mval = np.reshape(xval,(xval.shape[0],xval.shape[1],xval.shape[2],xval.shape[3]))
         
                                 if loss == 'classif':
-                                    ytrain_grp = dpr.YProcessing2(ytrain,nb_classes)
-                                    yval_grp = dpr.YProcessing2(yval,nb_classes)
+                                    ytrain_grp = dpr.ground_truth_processing2(ytrain,nb_classes)
+                                    yval_grp = dpr.ground_truth_processing2(yval,nb_classes)
                                     if p.use_test_set:
-                                        ytest_grp = dpr.YProcessing2(ytest,nb_classes)
+                                        ytest_grp = dpr.ground_truth_processing2(ytest,nb_classes)
                                         
                                 elif loss == 'triplet':
-                                    ytrain_grp = np.transpose(np.concatenate(([ytrain[:,0]],[np.argmax(dpr.YProcessing2(ytrain,nb_classes),axis=1)]),axis=0))
-                                    yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.YProcessing2(yval,nb_classes),axis=1)]),axis=0))
+                                    ytrain_grp = np.transpose(np.concatenate(([ytrain[:,0]],[np.argmax(dpr.ground_truth_processing2(ytrain,nb_classes),axis=1)]),axis=0))
+                                    yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.ground_truth_processing2(yval,nb_classes),axis=1)]),axis=0))
                                     if p.use_test_set:
-                                        ytest_grp =np.transpose(np.concatenate(([ytest[:,0]],[np.argmax(dpr.YProcessing2(ytest,nb_classes),axis=1)]),axis=0))
+                                        ytest_grp =np.transpose(np.concatenate(([ytest[:,0]],[np.argmax(dpr.ground_truth_processing2(ytest,nb_classes),axis=1)]),axis=0))
                                 else:
-                                    ytrain_grp = uf.YProcessing4(ytrain,'YEAR')
-                                    yval_grp = uf.YProcessing4(yval,'YEAR')
+                                    ytrain_grp = uf.ground_truth_processing4(ytrain,'YEAR')
+                                    yval_grp = uf.ground_truth_processing4(yval,'YEAR')
                                     if p.use_test_set:
-                                        ytest_grp = uf.YProcessing4(ytest,'YEAR')
+                                        ytest_grp = uf.ground_truth_processing4(ytest,'YEAR')
                                         
-                                    ytrain_grpwc = uf.YProcessing4(ytrain,'YEARWC')
-                                    yval_grpwc = uf.YProcessing4(yval,'YEARWC')
+                                    ytrain_grpwc = uf.ground_truth_processing4(ytrain,'YEARWC')
+                                    yval_grpwc = uf.ground_truth_processing4(yval,'YEARWC')
                                     if p.use_test_set:
-                                        ytest_grpwc = uf.YProcessing4(ytest,'YEARWC')
+                                        ytest_grpwc = uf.ground_truth_processing4(ytest,'YEARWC')
                                         
-                                    ytrain_grp3 = uf.YProcessing4(ytrain,'THREE')
-                                    yval_grp3 = uf.YProcessing4(yval,'THREE')
+                                    ytrain_grp3 = uf.ground_truth_processing4(ytrain,'THREE')
+                                    yval_grp3 = uf.ground_truth_processing4(yval,'THREE')
                                     if p.use_test_set:
-                                        ytest_grp3 = uf.YProcessing4(ytest,'THREE')
+                                        ytest_grp3 = uf.ground_truth_processing4(ytest,'THREE')
                                         
-                                    ytrain_grpwc3 = uf.YProcessing4(ytrain,'THREEWC')
-                                    yval_grpwc3 = uf.YProcessing4(yval,'THREEWC')
+                                    ytrain_grpwc3 = uf.ground_truth_processing4(ytrain,'THREEWC')
+                                    yval_grpwc3 = uf.ground_truth_processing4(yval,'THREEWC')
                                     if p.use_test_set:
-                                        ytest_grpwc3 = uf.YProcessing4(ytest,'THREEWC')
+                                        ytest_grpwc3 = uf.ground_truth_processing4(ytest,'THREEWC')
                                     
                                 if loss=='discret' or loss == 'RankAnddiscret':
                                     if p.use_test_set:
@@ -571,13 +571,13 @@ if __name__ == "__main__":
                                 pred =  BilinearModel(p.interpolation_size,modelCN = model_cnn,model_cnn_2 = model_cnn_2, mode = loss,D3=D3,spp=spp,attention=attention,num=nb_classes)
                             else: 
                                 if pretrain == 'triplet':
-                                    # pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=param_tri_rate,conv1=conv_1,maxi = Maxi)  
-                                    pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
+                                    # pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=param_tri_rate,conv1=conv_1)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,l11=l2reg)  
 
                                 elif pretrain == 'binary':
-                                    pred = deepConvSurv(p.interpolation_size,mode = 'classif',D3=D3,spp=spp,attention=attention,num=2,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = 'classif',D3=D3,spp=spp,attention=attention,num=2,rate=rate,conv1=conv_1,l11=l2reg)  
                                 else:
-                                    pred = deepConvSurv(p.interpolation_size,mode = loss ,D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = loss ,D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,l11=l2reg)  
 
                             ''' *****************************************'''
                             ''' **************PRETRAINING****************'''
@@ -1023,14 +1023,14 @@ if __name__ == "__main__":
                                     yvalL=  uf.FromTimeToLong(yval,breaks)
                                     yvalT =  yval
                                     if loss == 'classif':
-                                        yval_grp = dpr.YProcessing2(yval,nb_classes)
+                                        yval_grp = dpr.ground_truth_processing2(yval,nb_classes)
                                     elif loss == 'triplet':
-                                        yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.YProcessing2(yval,nb_classes),axis=1)]),axis=0))
+                                        yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.ground_truth_processing2(yval,nb_classes),axis=1)]),axis=0))
                                     else:
-                                        yval_grp = uf.YProcessing4(yval,'YEAR')
-                                        yval_grpwc = uf.YProcessing4(yval,'YEARWC')
-                                        yval_grp3 = uf.YProcessing4(yval,'THREE')
-                                        yval_grpwc3 = uf.YProcessing4(yval,'THREEWC')
+                                        yval_grp = uf.ground_truth_processing4(yval,'YEAR')
+                                        yval_grpwc = uf.ground_truth_processing4(yval,'YEARWC')
+                                        yval_grp3 = uf.ground_truth_processing4(yval,'THREE')
+                                        yval_grpwc3 = uf.ground_truth_processing4(yval,'THREEWC')
                                     
                                     if loss =='discret'or loss=='RankAnddiscret':    
                                         ax=predictionShow('valgrp',yvalT,np.reshape(np.array(predictionval),(-1,1)),writer)
@@ -1270,18 +1270,18 @@ if __name__ == "__main__":
                                     else:
                                         fee = caw.predict(xtrain) #shape (B,1,1,64)
                                         feetest = caw.predict(xval) #shape (B,1,1,64)
-                                    if D3:
+                                    if D3 == 'True':
                                         fee=np.reshape(fee,(np.shape(fee)[0],np.shape(fee)[4]))
                                     else:
                                         fee=np.reshape(fee,(np.shape(fee)[0],np.shape(fee)[3]))
                                         
-                                    if D3:
+                                    if D3  == 'True':
                                         feetest=np.reshape(feetest,(np.shape(feetest)[0],np.shape(feetest)[4]))
                                     else:
                                         feetest=np.reshape(feetest,(np.shape(feetest)[0],np.shape(feetest)[3]))
                                         
                                     
-                                    if not D3:
+                                    if D3 == 'False':
                                         if attention != 'c':
                                             layerSAW = utils.find_layer_idx(saved_model,'spatial_attention_weight')
                                             saw = Model(inputs=saved_model.inputs,outputs=saved_model.layers[layerSAW].output)
@@ -1290,7 +1290,7 @@ if __name__ == "__main__":
                                             else:
                                                 
                                                 fee2 = saw.predict(xtrain)#shape (B,9,9,1)
-                                            if D3:                         
+                                            if D3  == 'True':                         
                                                 fee2=np.reshape(fee2,(np.shape(fee2)[0],np.shape(fee2)[1],np.shape(fee2)[2],np.shape(fee2)[3]))
                                             else: 
                                                 fee2=np.reshape(fee2,(np.shape(fee2)[0],np.shape(fee2)[1],np.shape(fee2)[2]))
@@ -1300,7 +1300,7 @@ if __name__ == "__main__":
                                                 fee2val = saw.predict([xval,mval])
                                             else:
                                                 fee2val = saw.predict(xval)
-                                            if D3:                         
+                                            if D3  == 'True':                         
                                                 fee2val=np.reshape(fee2val,(np.shape(fee2val)[0],np.shape(fee2val)[1],np.shape(fee2val)[2],np.shape(fee2val)[3]))
                                             else: 
                                                 fee2val=np.reshape(fee2val,(np.shape(fee2val)[0],np.shape(fee2val)[1],np.shape(fee2val)[2]))                                           
@@ -1310,7 +1310,7 @@ if __name__ == "__main__":
                                                     fee2test = saw.predict([xtest,mtest])
                                                 else:
                                                     fee2test = saw.predict(xtest)
-                                                if D3:                         
+                                                if D3  == 'True':                         
                                                     fee2test=np.reshape(fee2test,(np.shape(fee2test)[0],np.shape(fee2test)[1],np.shape(fee2test)[2],np.shape(fee2test)[3]))
                                                 else: 
                                                     fee2test=np.reshape(fee2test,(np.shape(fee2test)[0],np.shape(fee2test)[1],np.shape(fee2test)[2]))
@@ -1345,7 +1345,7 @@ if __name__ == "__main__":
                                     #     plt.imshow(np.reshape(sumcawt,(1,64)))
                                     #     plt.xticks(list(range(0,64,5)))
                                 
-                                    if not D3:
+                                    if D3 == 'False':
                                         writer = tf.summary.FileWriter(log_dir)
                                         cawt = [tf.convert_to_tensor(np.reshape( fee,(np.shape(fee)[0],np.shape(fee)[3],1)))]
                                         s = sess.run(tf.summary.image('channel_attention_weight_train', tf.stack(cawt)))
@@ -1365,7 +1365,7 @@ if __name__ == "__main__":
             
                                     writer = tf.summary.FileWriter(log_dir)
                                     sortedfilters = np.sort(sumcawt)[::-1]
-                                    if not D3:
+                                    if D3 == 'False':
                                     
                                         cawt = [tf.convert_to_tensor(np.reshape(sumcawt,(1,np.shape(sumcawt)[2],1)))]
                                     else:
@@ -1374,7 +1374,7 @@ if __name__ == "__main__":
                                     s = sess.run(tf.summary.image('Sum_channel_attention_weight_train_over_patients', tf.stack(cawt)))
                                     writer.add_summary(s)
                                                         
-                                    if not D3:
+                                    if D3 == 'False':
                                         cawt = [tf.convert_to_tensor(np.reshape( fee,(np.shape(fee)[0],np.shape(fee)[3],1)))]
                                         s = sess.run(tf.summary.image('channel_attention_weight_train', tf.stack(cawt)))
                                         writer.add_summary(s)
@@ -1388,7 +1388,7 @@ if __name__ == "__main__":
                                     # writer.add_summary(s)
                                     
                                     
-                                    if not D3:
+                                    if D3 == 'False':
                                         ##### Features map
                                         if attention == 'cs':
                                             layerFeat = utils.find_layer_idx(saved_model,'res')
@@ -1404,7 +1404,7 @@ if __name__ == "__main__":
                                         
                                         for patientn in range(20):
                                             writer = tf.summary.FileWriter(log_dir)
-                                            with tf.name_scope('channel_feat_map_Pat_{}'.format(patientn)):
+                                            with tf.name_scope(f'channel_feat_map_Pat_{patientn}'):
                                                 for fi in range(len(sumcawt)): 
                                                     image  = tf.convert_to_tensor(np.reshape(xtrain[patientn,:,:,fi],(1,np.shape(xtrain)[1],np.shape(xtrain)[2],1)))
                                                     s = sess.run(tf.summary.image('xtrain',image))

@@ -20,13 +20,13 @@ from keras.utils import to_categorical
 ###############################################################################"""
 
 
-def patchP(PATH,reload,interS,method='all',D3=False,npatch=9,sess=None):
+def patchP(PATH,reload_patches,interS,method='all',D3='False',npatch=9,sess=None):
     """ 
     Load 9 patches with done with the bouding box and interpolate to interpolsize if method = box, 
 
     else, 9 patches of the lesion with the interpolsize size and the associatec mask 
     """
-    if D3==True:
+    if D3 == 'True':
         na = "liste_patchs"+str(interS) + method+ str(npatch)+"3D.npy"
         na2 = "liste_maskP"+str(interS) + method+ str(npatch)+"3D.npy"
         na3 = "liste_patients"+str(interS) + method+ str(npatch)+"3D.npy"
@@ -41,7 +41,7 @@ def patchP(PATH,reload,interS,method='all',D3=False,npatch=9,sess=None):
         na5 = "errors"+str(interS) + method+ str(npatch)+".npy"
         na6 = "data"+str(interS) + method+ str(npatch)+".npy"
     if os.path.exists(na) and os.path.exists(na3) and os.path.exists(na2) and os.path.exists(na5)and os.path.exists(na4) :
-        if reload == True :
+        if reload_patches  :
             print("---------Patch processing already done ----------")
             liste_patches = np.load(na)
             liste_patients = np.load(na3)
@@ -52,8 +52,8 @@ def patchP(PATH,reload,interS,method='all',D3=False,npatch=9,sess=None):
             data.index =data.iloc[:,0]
             data =data.iloc[:,1:3]
             if np.shape(liste_patches)[0]==0 or np.shape(liste_patients)[0]==0 or  np.shape(liste_ref)[0]==0 or np.shape(errors)[0]==0 or np.shape(liste_patches)[1] != interS:
-                print("---------reload because wrong size ----------")
-                patch_pp= pp(PATH,interS,method,reload,D3,npatch,sess=sess)
+                print("---------reload_patches because wrong size ----------")
+                patch_pp= pp(PATH,interS,method,reload_patches,D3,npatch,sess=sess)
                 data, liste_patches, liste_ref, liste_patients, errors,liste_mask = patch_pp.data, patch_pp.liste_patches, patch_pp.liste_ref, patch_pp.liste_patients , patch_pp.errors, patch_pp.liste_mask
                 print('************** patch size',np.shape(liste_patches))
                 np.save(na,liste_patches)
@@ -65,7 +65,7 @@ def patchP(PATH,reload,interS,method='all',D3=False,npatch=9,sess=None):
                 
         else :        
             print("---------restart patch calculation ----------")
-            patch_pp= pp(PATH,interS,method,reload,D3,npatch,sess=sess)
+            patch_pp= pp(PATH,interS,method,reload_patches,D3,npatch,sess=sess)
             data, liste_patches, liste_ref, liste_patients, errors, liste_mask= patch_pp.data, patch_pp.liste_patches, patch_pp.liste_ref, patch_pp.liste_patients , patch_pp.errors,patch_pp.liste_mask
             np.save(na,liste_patches)
             np.save(na3,liste_patients)
@@ -76,7 +76,7 @@ def patchP(PATH,reload,interS,method='all',D3=False,npatch=9,sess=None):
         
     else :
         print("--------- patches doesn t exist ----------")
-        patch_pp= pp(PATH,interS,method,reload,D3,npatch,sess=sess)
+        patch_pp= pp(PATH,interS,method,reload_patches,D3,npatch,sess=sess)
         data, liste_patches, liste_ref, liste_patients, errors, liste_mask= patch_pp.data, patch_pp.liste_patches, patch_pp.liste_ref, patch_pp.liste_patients , patch_pp.errors,patch_pp.liste_mask
         np.save(na,liste_patches)
         np.save(na3,liste_patients)
@@ -96,7 +96,7 @@ def patchP(PATH,reload,interS,method='all',D3=False,npatch=9,sess=None):
 ######################### y processing ####################################
 ###############################################################################"""
    
-def YProcessing(data,liste_patients,classes):    
+def ground_truth_processing(data,liste_patients,classes):    
     y = data.copy()
     
     for pat in data.index:
@@ -160,7 +160,7 @@ def splitting(liste_patients,y_grp,classes,change,liste_interpolate):
         y_grp= yy
         
     #### create vector of indexes
-    if change == True:
+    if change :
         rnd_data = np.random.permutation(len(liste_patients))
     else: 
         if classes[-2:] == 'WC':

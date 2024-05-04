@@ -113,14 +113,14 @@ def makeTifFromPile(pathToPile,correct):
     imsave(pathToTifMask, mask_array)
     return pathToTifMask
 
-def positive_patch(mask,k, pd_mask,pourcent_ratio=0.4,ThirdDim=3,num=5): #taille patch = 2k+1, 2k+1, 3
+def positive_patch(mask,k, pd_mask,pourcent_ratio=0.4,third_dim=3,num=5): #taille patch = 2k+1, 2k+1, 3
     ''' 
     Input
         mask : array with one mask per lesion
         k : half of the size of the image
         pd_mask : mask with padding
         pourcent_ratio : ratio of pixels belonging to the lesion to considere the patch as positive
-        ThirdDim : if equal to 3, patches with size (2k+1,2k+1,3)
+        third_dim : if equal to 3, patches with size (2k+1,2k+1,3)
                    if equal to "3D"", patches with size (2k+1,2k+1,2k+1)
     Return 
         liste_pos : list of positive patches from a 3D mask
@@ -128,7 +128,7 @@ def positive_patch(mask,k, pd_mask,pourcent_ratio=0.4,ThirdDim=3,num=5): #taille
     
     Donne liste des patchs positifs du mask 3D. Pourcent_ratio: pourcentage of positive pixels to be positive.
     
-    if ThirdDim = 3:  ou (2k+1,2k+1,2k+1) si ThirdDim="3D"'''
+    if third_dim = 3:  ou (2k+1,2k+1,2k+1) si third_dim="3D"'''
     print('     Looking for positives patchs ...')
     indice=np.where(mask!=0)
     min_x, max_x, min_y, max_y,min_z, max_z =indice[0].min(),indice[0].max(),indice[1].min(),indice[1].max(),indice[2].min(),indice[2].max()
@@ -149,7 +149,7 @@ def positive_patch(mask,k, pd_mask,pourcent_ratio=0.4,ThirdDim=3,num=5): #taille
     return liste_pos, liste_coord_pos            
 
 
-def random_patch(mask,k, pourcent_ratio, nb_patch,image,pd_image,pd_mask,PATHpat,ThirdDim=3):
+def random_patch(mask,k, pourcent_ratio, nb_patch,image,pd_image,pd_mask,PATHpat,third_dim=3):
     ''' 
     Input
         mask : array with one mask per lesion
@@ -160,7 +160,7 @@ def random_patch(mask,k, pourcent_ratio, nb_patch,image,pd_image,pd_mask,PATHpat
         pd_mask : mask with padding
         pd_mask : images with padding
         PATHpat : path to the lesion folder
-        ThirdDim : if equal to 3, patches with size (2k+1,2k+1,3)
+        third_dim : if equal to 3, patches with size (2k+1,2k+1,3)
                    if equal to "3D"", patches with size (2k+1,2k+1,2k+1)
     Return
         liste_value : Binary value of the patch (0 if it belongs to the background (negative) and 1 if it belongs to the lesion (positive))
@@ -170,7 +170,7 @@ def random_patch(mask,k, pourcent_ratio, nb_patch,image,pd_image,pd_mask,PATHpat
     print('creation of random patches list ...')
     nb_pos=nb_patch//2
     nb_neg = nb_patch - nb_pos
-    liste_pos, liste_coord_pos = positive_patch(mask,k,pd_mask,pourcent_ratio,ThirdDim=3)
+    liste_pos, liste_coord_pos = positive_patch(mask,k,pd_mask,pourcent_ratio,third_dim=3)
     #liste_pos : list of positive patches, liste_coord-pos: list of the coordonates (x,y,z) of the patches
     liste_patch_coord,liste_indice, liste_value,liste_patch,listI=[],[],[],[],[]
     while len(liste_indice) <= nb_pos and len(listI) <= len(liste_pos):
@@ -218,21 +218,21 @@ def all_patch(mask,k, pourcent_ratio, nb_patch,nim,pd_image,pd_mask):
     return liste_patch, liste_patch_value, liste_patch_coord
 
 
-def binary_extraction(RR,CrossVal,PATH,sess,TEST=False, interpolSize=36):
+def binary_extraction(list_pat_ref,CrossVal,PATH,sess,TEST=False, interpolSize=36):
     if CrossVal== False:
         print("import binary")
-        rtrainB = np.load('./Results/PATIENTS_SEP_TO_KEEP_154/Balance.npy')
-        rvalB = np.load('./Results/PATIENTS_SEP_TO_KEEP_154/Aval.npy')
-        rtestB = np.load('./Results/PATIENTS_SEP_TO_KEEP_154/Ate.npy')
+        rtrainB = np.load(os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Balance.npy'))
+        rvalB = np.load((os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Aval.npy'))
+        rtestB = np.load((os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Ate.npy'))
         print(' .............. TRAIN LIST CREATION ...............................')     
         xbitrain3D, ybitrain3D=mds.create_train(rtrainB,4, 0.4, 10,PATH)
-        xbitrain3D, ybitrain3D = dpr.shuffle_and_interpolate(xbitrain3D, ybitrain3D,interpolSize,ThirdDim = '3D',sess=sess)
+        xbitrain3D, ybitrain3D = dpr.shuffle_and_interpolate(xbitrain3D, ybitrain3D,interpolSize,third_dim = '3D',sess=sess)
         print(' .............. VALIDATION LIST CREATION .................................')
         xbival3D, ybival3D = mds.create_train(rvalB,4,0.4,10,PATH)
-        xbival3D, ybival3D = dpr.shuffle_and_interpolate(xbival3D, ybival3D,interpolSize,ThirdDim = '3D',sess=sess)
+        xbival3D, ybival3D = dpr.shuffle_and_interpolate(xbival3D, ybival3D,interpolSize,third_dim = '3D',sess=sess)
         print(' .............. TEST LIST CREATION .................................')
         # xbitest, ybitest = uf.create_train(rtest,4,0.4,50,PATH)
-        # xbitest, ybitest = dpr.shuffle_and_interpolate(xbitest, ybitest,interpolSize,ThirdDim = '3D')
+        # xbitest, ybitest = dpr.shuffle_and_interpolate(xbitest, ybitest,interpolSize,third_dim = '3D')
         
         encoder = LabelEncoder()
         ybitrain3D = to_categorical(encoder.fit_transform(ybitrain3D))
@@ -273,43 +273,43 @@ def binary_extraction(RR,CrossVal,PATH,sess,TEST=False, interpolSize=36):
         xbival2D, ybival2D = shuffle(xbival2D,ybival2D)
         return xbitrain2D, ybitrain2D, xbival2D,ybival2D
     else:
-        # rrB = np.delete(RR,f)
-        Xb2D, Yb2D= [[] for i in range(len(RR))],[[] for i in range(len(RR))]
-        Xb3D, Yb3D = [[] for i in range(len(RR))],[[] for i in range(len(RR))]
+        # rrB = np.delete(list_pat_ref,f)
+        Xb2D, Yb2D= [[] for i in range(len(list_pat_ref))],[[] for i in range(len(list_pat_ref))]
+        Xb3D, Yb3D = [[] for i in range(len(list_pat_ref))],[[] for i in range(len(list_pat_ref))]
         print('calculate binary patches')
-        for k in range(len(RR)):
+        for k in range(len(list_pat_ref)):
             print(k)
-            rvalB = RR[k]
-            if TEST==True:
+            rvalB = list_pat_ref[k]
+            if TEST:
                 if k==0:
-                    rtrainB=[RR[1],RR[2],RR[3],RR[4]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[3],list_pat_ref[4]]
                 elif k==1:
-                    rtrainB=[RR[0],RR[2],RR[3],RR[4]]
+                    rtrainB=[list_pat_ref[0],list_pat_ref[2],list_pat_ref[3],list_pat_ref[4]]
                 elif k==2:
-                    rtrainB=[RR[1],RR[0],RR[3],RR[4]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[3],list_pat_ref[4]]
                 elif k==3:
-                    rtrainB=[RR[1],RR[0],RR[2],RR[4]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[2],list_pat_ref[4]]
                 else:
-                    rtrainB=[RR[1],RR[2],RR[0],RR[3]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[0],list_pat_ref[3]]
                 rtrainB=np.concatenate((rtrainB[0],rtrainB[1],rtrainB[2],rtrainB[3]))
             else:
                 if k==0:
-                    rtrainB=[RR[1],RR[2],RR[3]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[3]]
                 elif k==1:
-                    rtrainB=[RR[0],RR[2],RR[3]]
+                    rtrainB=[list_pat_ref[0],list_pat_ref[2],list_pat_ref[3]]
                 elif k==2:
-                    rtrainB=[RR[1],RR[0],RR[3]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[3]]
                 else:
-                    rtrainB=[RR[1],RR[0],RR[2]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[2]]
                 rtrainB=np.concatenate((rtrainB[0],rtrainB[1],rtrainB[2]))
             
             
             print(' .............. TRAIN LIST CREATION ...............................')     
             xbitrain3D, ybitrain3D=mds.create_train(rtrainB,4, 0.5, 10,PATH)
-            xbitrain3D, ybitrain3D = dpr.shuffle_and_interpolate2(xbitrain3D, ybitrain3D,interpolSize,ThirdDim = '3D',sess = sess)
+            xbitrain3D, ybitrain3D = dpr.shuffle_and_interpolate2(xbitrain3D, ybitrain3D,interpolSize,third_dim = '3D',sess = sess)
             print(' .............. VALIDATION LIST CREATION .................................')
             xbival3D, ybival3D = mds.create_train(rvalB,4,0.5,10,PATH)
-            xbival3D, ybival3D = dpr.shuffle_and_interpolate2(xbival3D, ybival3D,interpolSize,ThirdDim = '3D',sess=sess)
+            xbival3D, ybival3D = dpr.shuffle_and_interpolate2(xbival3D, ybival3D,interpolSize,third_dim = '3D',sess=sess)
             encoder = LabelEncoder()
             ybitrain3D = to_categorical(encoder.fit_transform(ybitrain3D))
             ybival3D = to_categorical(encoder.fit_transform(ybival3D))
