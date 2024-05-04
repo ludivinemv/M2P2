@@ -71,7 +71,7 @@ def DataAugmentation3D(da,x,y,mask,ref,num):
         return scipy.ndimage.interpolation.shift(image, (int(offset[0]), int(offset[1]),int(offset[2])), order=order, mode='nearest')
     
     def scaleit(image, factor=1.2, isseg=False):
-        order = 0 if isseg == True else 3
+        order = 0 if isseg  else 3
         height, width, depth= image.shape
         zheight             = int(np.round(factor * height))
         zwidth              = int(np.round(factor * width))
@@ -97,7 +97,7 @@ def DataAugmentation3D(da,x,y,mask,ref,num):
             return image
 
     def rotateit(image, theta, isseg=False,axis=(1,0)):
-        order = 0 if isseg == True else 5
+        order = 0 if isseg  else 5
         return scipy.ndimage.rotate(image, float(theta), reshape=False,axes=axis ,order=order, mode='nearest')
     
     def flipit(image, axes):
@@ -135,7 +135,7 @@ def DataAugmentation3D(da,x,y,mask,ref,num):
 
 
 
-def dataAugmentation(da,x,y,m,ref,D3=True,num = 30,fold=5):
+def dataAugmentation(da,x,y,m,ref,D3='True',num = 30,fold=5):
     """ 
     Input
         da : vector of predifined augmentation parameters
@@ -154,7 +154,7 @@ def dataAugmentation(da,x,y,m,ref,D3=True,num = 30,fold=5):
         return scipy.ndimage.interpolation.shift(image, (int(offset[0]), int(offset[1])), order=order, mode='nearest')
     
     def scaleit(image, factor=1.2, isseg=False):
-        order = 0 if isseg == True else 3
+        order = 0 if isseg  else 3
         height, width, depth= image.shape
         zheight             = int(np.round(factor * height))
         zwidth              = int(np.round(factor * width))
@@ -176,7 +176,7 @@ def dataAugmentation(da,x,y,m,ref,D3=True,num = 30,fold=5):
             return image
 
     def rotateit(image, theta, isseg=False,axis=(1,0)):
-        order = 0 if isseg == True else 5
+        order = 0 if isseg  else 5
         return scipy.ndimage.rotate(image, float(theta), reshape=False,axes=axis ,order=order, mode='nearest')
     
     def flipit(image, axes):
@@ -201,7 +201,7 @@ def dataAugmentation(da,x,y,m,ref,D3=True,num = 30,fold=5):
         if b%5==0:
             print(b)
         for k in range(num):
-            if D3==False:
+            if D3=='False':
                 xt.append(transf(x[b,:,:,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k]))
                 mt.append(transf(m[b,:,:,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k]))
                 yt.append(y[b])
@@ -292,7 +292,7 @@ def image_mask_ref(PATH):
         list of images, list of masks and list of patients
     """
     
-    filename = "./output.csv"
+    filename = "output.csv"
     data = pd.read_csv(filename,sep=';',names=['patient','event','time'])
     patient = list(data.loc[:,'patient'])
     for i in range(len(data.loc[:,'patient'])):
@@ -343,8 +343,8 @@ def padding(image,k): #padding to permit to take in count edges
     return pad_image
 
 def read_output():
-    """ Read ./output.csv and give a dataframe with event and time."""
-    filename = "./output.csv"
+    """ Read output.csv and give a dataframe with event and time."""
+    filename = "output.csv"
     data = pd.read_csv(filename,sep=';',names=['patient','event','time'])
     patient = list(data.loc[:,'patient'])
     for i in range(len(data.loc[:,'patient'])):
@@ -391,7 +391,7 @@ def shuffle_and_interpolate(liste_patch, liste_y,liste_ref,interpolSize,interSta
         liste_mask=np.array(liste_mask)
     liste_y=np.array(liste_y)
     
-    if interStatue == True:
+    if interStatue :
         liste_patch = interpolation3D(liste_patch,interpolSize,ThirdDim,sess=sess)
 
     x = np.arange(0,len(liste_y))
@@ -422,7 +422,7 @@ def shuffle_and_interpolate2(liste_patch, liste_y,interpolSize,interStatue=True,
         liste_mask=np.array(liste_mask)
     liste_y=np.array(liste_y)
     
-    if interStatue == True:
+    if interStatue :
         liste_patch = interpolation3D(liste_patch,interpolSize,ThirdDim,sess=sess)
 
     x = np.arange(0,len(liste_y))
@@ -444,7 +444,7 @@ def shuffle_and_interpolate2(liste_patch, liste_y,interpolSize,interStatue=True,
 
 
 
-def YProcessing(data,liste_patients,classes):    
+def ground_truth_processing(data,liste_patients,classes):    
     y = data.copy()
     
     for pat in data.index:
@@ -484,7 +484,7 @@ def YProcessing(data,liste_patients,classes):
     return y_grp
 
 
-def YProcessing3(y,classe): #binaire entre CLASSE 0 et autres
+def ground_truth_processing3(y,classe): #binaire entre CLASSE 0 et autres
     y= pd.DataFrame(y) 
     y.columns = ('event','time')
     y_grp = y.copy()
@@ -502,7 +502,7 @@ def YProcessing3(y,classe): #binaire entre CLASSE 0 et autres
 
 
 
-def YProcessing4(y,classes):
+def ground_truth_processing4(y,classes):
     y= pd.DataFrame(y) 
     y.columns = ('event','time')
     y_grp = y.copy()
@@ -561,7 +561,7 @@ def YProcessing4(y,classes):
 
 
 
-def YProcessing2(y,classe):
+def ground_truth_processing2(y,classe):
     if classe == 3:
         classes = 'THREE'
     elif classe == 7 or classe == 5:
@@ -723,11 +723,12 @@ def separation(doss,List_of_Patient,rates=[0.5,0.25,0.25],outnames = "./output.c
         rcc=[random.sample(rcc[i],len(rcc[i])) for i in range(len(rcc))]
         for i in range(len(rcc)):
             np.save(doss+"r"+ str(i),np.array(rcc[i]))
+            
     return rcc
 
 
 
-def classifyPatients(List_of_Patient,outnames = "./output.csv",sep=';') :
+def classifyPatients(List_of_Patient,outnames = "output.csv",sep=';') :
     filename = outnames
     data = pd.read_csv(filename,sep=sep,names=['patient','event','time'])
     patient = list(data.loc[:,'patient'])
@@ -788,7 +789,7 @@ def BalancedSeparation(List_of_Patient,file,rates=[0.5,0.25,0.25],classe = 'YEAR
             noC = 3
         else:
             noC = 2
-        y_grp = YProcessing(data,List_of_Patient,classe)
+        y_grp = ground_truth_processing(data,List_of_Patient,classe)
     
     C= []
     for i in range(noC):
@@ -1063,7 +1064,7 @@ def saving(fitting,title,eval_train, eval_val,resu,file,metrics):
         plt.ylabel('Loss')
         plt.xlabel('Epoch')
         #plt.show()
-        pathSaveFIG = file+ '/' +title + '_curves.png'
+        pathSaveFIG = os.path.join(file, f'{title}_curves.png'
         plt.savefig(pathSaveFIG)
     plt.close('all')
     results = pd.DataFrame(np.zeros((2, 2)),columns=['Loss',metrics],index = ['train','val'])
@@ -1073,8 +1074,7 @@ def saving(fitting,title,eval_train, eval_val,resu,file,metrics):
     results.loc["val",'Loss'] = eval_val[0]
     if resu != None:
         results.loc["test",metrics] = resu
-#    PATHEV= file + '/'  + title + 'evaluation.csv'
-#    results.to_csv(PATHEV)
+
     return results
 
 
@@ -1152,21 +1152,22 @@ def predictionShow(name,y,prediction,writer,sess, file, titleP,log_dir, number=1
     evalu = [tf.convert_to_tensor([str(array[0,i]) for i in range(number)]),
              tf.convert_to_tensor([str(array[1,i]) for i in range(number)]),
             tf.convert_to_tensor([str(array[2,i]) for i in range(number)])         ]
-    s = sess.run(tf.summary.text('Ranked{}Prediction'.format(name), tf.stack(evalu)))
+    s = sess.run(tf.summary.text(f'Ranked{name}Prediction', tf.stack(evalu)))
     writer.add_summary(s)
     
+    time_pred_figure = os.path.join(file,f'{titleP}{name}Pred.png')
     axi=plt.plot(array[2,np.where(array[0,:]==0)],array[1,np.where(array[0,:]==0)],'ro',label='with censorship')                    
     axi=plt.plot(array[2,np.where(array[0,:]==1)],array[1,np.where(array[0,:]==1)],'bo',label='without censorship')
-    axi=plt.xlabel('{} prediction'.format(name))
+    axi=plt.xlabel(f'{name} prediction')
     axi=plt.ylabel('real time')
-    axi=plt.title('time according to {} prediction (red: censorship)'.format(name))
-    axi.get_figure().savefig(file+'/' + titleP +'{}Pred.png'.format(name))
+    axi=plt.title(f'time according to {name} prediction (red: censorship)')
+    axi.get_figure().savefig(time_pred_figure)
     plt.close()
-    curves = plt.imread(file+'/' + titleP +'{}Pred.png'.format(name))
+    curves = plt.imread(time_pred_figure)
     
     writer = tf.summary.FileWriter(log_dir)
     fi = tf.convert_to_tensor(np.reshape( curves,(1,np.shape(curves)[0],np.shape(curves)[1],np.shape(curves)[2])))
-    s = sess.run(tf.summary.image('{}predictions'.format(name), tf.stack(fi)))
+    s = sess.run(tf.summary.image(f'{name}predictions', tf.stack(fi)))
     writer.add_summary(s)
     plt.close()
     return axi
@@ -1258,15 +1259,16 @@ def groupeByBestSep(ytrain,predictiontrain,bestsep,file,titleP,name,sess,typee =
         kmf.fit(groupe2['time'], groupe2['event'], label='bad prognosis')
         axa = kmf.plot(ax=axa)
     
-    axa.get_figure().savefig(file+'/' + titleP +'{}Kaplan.png'.format(name))   
+    kaplan_figure = os.path.join(file,f"{titleP}{name}Kaplan.png")
+    axa.get_figure().savefig(kaplan_figure)   
     plt.close()
-    curves2 = plt.imread(file+'/' + titleP +'{}Kaplan.png'.format(name))
+    curves2 = plt.imread(kaplan_figure)
     
-    log_dir = file+'/' + "logs/fit/" +titleP +'/' #datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = os.path.join(file,"logs","fit",titleP) 
 
     writer = tf.summary.FileWriter(log_dir)
     fi2 = tf.convert_to_tensor(np.reshape( curves2,(1,np.shape(curves2)[0],np.shape(curves2)[1],np.shape(curves2)[2])))
-    s = sess.run(tf.summary.image('{}kaplanMeier'.format(name), tf.stack(fi2)))
+    s = sess.run(tf.summary.image(f'{name}kaplanMeier', tf.stack(fi2)))
     writer.add_summary(s)
     plt.close()
     return  pval,bestsep,numG0,numG1 

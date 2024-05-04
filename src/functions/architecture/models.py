@@ -8,119 +8,164 @@ Copyright (c) 2021 ludivinemv
 import tensorflow.keras.backend as K
 import tensorflow as tf
 import re
+from pathlib import Path
 import numpy as np
-from skimage import io
-from keras.layers import Input, Dense, Conv2D, Flatten,  Dropout,MaxPool3D #,# BatchNormalization#,GlobalAveragePooling2D
 import keras
-from triplet_loss import batch_hard_triplet_loss
-import losses as lss
-import BprocessFunction as pf
-import pandas as pd
-from vis.utils import utils
+from keras_contrib.layers.normalization.instancenormalization  import InstanceNormalization
+from keras import regularizers
+from keras.utils import to_categorical
+from tensorflow  import  keras
+from keras.layers import Dense,LeakyReLU, Conv2D,Conv3D,Input, Dropout,MaxPool2D ,MaxPool3D, BatchNormalization,GlobalAveragePooling3D,AveragePooling2D,AveragePooling3D,GlobalAveragePooling2D
+from keras.layers import Lambda
+from keras.models import Model,Sequential
+
+from BprocessFunction import patchPHN, patchP, ground_truth_processing
 from attention_module import attach_attention_module
 from attention_module3D import attach_attention_module3D
-from keras import regularizers
-from sklearn.model_selection import ParameterGrid
-from keras_contrib.layers.normalization.instancenormalization  import InstanceNormalization
-import argparse
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import LabelEncoder
-import sklearn
-from sklearn.metrics import accuracy_score
-import pylab
-from keras.utils import to_categorical
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow  import  keras
-from keras.layers import Dense,LeakyReLU, Conv1D, Conv2D,Conv3D,Input, Flatten, Dropout,MaxPool2D ,MaxPool3D, BatchNormalization,GlobalAveragePooling3D,AveragePooling2D,AveragePooling3D,GlobalAveragePooling2D
-from keras.optimizers import adam
-from keras.layers import Lambda
-from keras.applications.vgg16 import VGG16
-from keras.models import Model,Sequential,load_model#, load_model
-import time
-import tensorflow
+
 import data_processing as dpr
 from tensorflow.python.ops import gen_nn_ops
+from typing import Any
 
-
-
-def outer_product(x):
-    """     calculate outer-products of 2 tensors
-        args    x =      list of 2 tensors assuming each of which has shape = (size_minibatch, total_pixels, size_filter)
+def outer_product(x:list[Any]):
+    """calculate outer-products of 2 tensors
+    
+    Args    
+        x (list[Any]):list of 2 tensors assuming each of which has shape = (size_minibatch, total_pixels, size_filter)
+    
     """
-    ff=keras.backend.batch_dot(x[0], x[1], axes=[1,1]) / x[0].get_shape().as_list()[1] 
-    return ff
+    outer = keras.backend.batch_dot(x[0], x[1], axes=[1,1]) / x[0].get_shape().as_list()[1] 
+    
+    return outer
+
 
 def signed_sqrt(x):
     return keras.backend.sign(x) * keras.backend.sqrt(keras.backend.abs(x) + 1e-9)
 
-def L2_norm(x, axis=-1):
-    ''' L2 normalisation '''
+
+def L2_norm(x:Any, axis: int=-1):
+    ''' L2 normalisation 
+    Args
+        x (Any): input to normalise
+        axis (int): Axis for normalisation. Default: -1
+    '''
     return keras.backend.l2_normalize(x, axis=axis)
 
-def expDim(xtest):
-    ''' Expend the dimension'''
-    rgbXtest= [[[[xtest[i,h,w],0,0] for w in range(np.shape(xtest)[2])]  for h in range(np.shape(xtest)[1])] for i in range(np.shape(xtest)[0])]
-    a=np.array(rgbXtest, dtype=np.float32)
-    return a
+
+def expend_dimension(x):
+    ''' Expend the dimension
+    '''
+    rgb_x= [[[[x[i,h,w],0,0] for w in range(np.shape(x)[2])]  for h in range(np.shape(x)[1])] for i in range(np.shape(x)[0])]
+    
+    expended = np.array(rgb_x, dtype=np.float32)
+    
+    return expended
+
 
 def getWords(text):
-    '''From a text input as a string, get the words separated by a space and return it as a list of strings'''
-    return re.compile('\w+').findall(text)
+    '''From a text input as a string, get the words separated by a space 
+    and return it as a list of strings
+    '''
     
+    return re.compile('\w+').findall(text)
 
 
-def ConvSurvBefore(interpolSize, D3=False,spp=True): #box shape (B,4) box : (xmin,ymin, h,w)
-    if D3==False: 
+def ConvSurvBefore(interpolSize:int, D3:str = 'False', spp:bool = True): #box shape (B,4) box : (xmin,ymin, h,w)
+    """Create the base model
+
+    Args:
+        interpolSize (int): size of the input
+        D3 (str, optional): If True, the input is 3D, if False the input is 2D, if 25 the input is a stack of 3 2D images Defaults to False.
+        spp (bool, optional): If True, use SPP block. Defaults to True.
+
+    """
+    if D3=='False': 
         input = Input(shape=(interpolSize, interpolSize, 1), name='input')
         mask = Input(shape=(interpolSize,interpolSize,1))
         modelCN = conv_netFirst(interpolSize,False,spp=spp)
+        
     elif D3=='25': 
         input = Input(shape=(interpolSize, interpolSize, 3,1), name='input')
         mask = Input(shape=(interpolSize,interpolSize,3,1))
         modelCN = conv_netFirst(interpolSize,True,spp=spp)
+        
     else:
         input = Input(shape=(interpolSize, interpolSize, interpolSize,1), name='input')
         mask = Input(shape=(interpolSize,interpolSize,interpolSize,1))
         modelCN = conv_netFirst(interpolSize,True,spp=spp)
+        
     output = modelCN(input) 
-    if spp == True:
-        spp= Lambda(SPP, name='spp')([output,mask]) 
+    
+    if spp:
+        spp = Lambda(SPP, name='spp')([output,mask]) 
     else:
-        spp = output # keras.layers.Reshape([K.int_shape(output)[1]*K.int_shape(output)[2]*K.int_shape(output)[3]],name=('resh44'))(output)
+        spp = output 
     model = Model(inputs = [input,mask], outputs = spp)
+    
     return model
   
-def PrepDataCrossVal(RR,PATH,change=False,interpolSize=36,reload=True,classes='surv',D3=False,method='all',dataAug=0,npatch=9,dataset='mm'):
-    if dataset=='hn':
-        data, liste_patches, liste_ref, liste_patients,errors,liste_mask = pf.patchPHN(PATH,reload,interpolSize,method,D3,npatch,dataset='hn')
+  
+def PrepDataCrossVal(list_pat_ref:list,
+                     path_patches: Path, 
+                     interpolSize:int = 36,
+                     reload_patches: bool = True, 
+                     classes:str = 'surv',
+                     D3:str = 'False',
+                     method:str='all',
+                     dataAug:int=0,
+                     npatch:int=9,
+                     dataset:str='mm'):
+    """Data preparation
+
+    Args:
+        list_pat_ref (list): list of patients
+        path_patches (Path): path to the patches
+        interpolSize (int, optional):  size of the input. Defaults to 36.
+        reload_patches (bool, optional): reload patches. Defaults to True.
+        classes (str, optional): type of ground truth. Defaults to 'surv'.
+        D3 (str, optional): If True, the input is 3D, if False the input is 2D, if 25 the input is a stack of 3 2D images Defaults to False.
+        method (str, optional): Method for patches. Defaults to 'all'.
+        dataAug (int, optional): Number of images for data augmentation. Defaults to 0.
+        npatch (int, optional): number of patches to extract. Defaults to 9.
+        dataset (str, optional): dataset. Defaults to 'mm'.
+
+    """
+    if dataset == 'hn':
+        data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchPHN(path_patches,reload_patches,interpolSize,method,D3,npatch,dataset='hn')
     else:
-        data, liste_patches, liste_ref, liste_patients,errors,liste_mask = pf.patchP(PATH,reload,interpolSize,method,D3,npatch)
-    y_grp = pf.YProcessing(data,liste_patients,classes)
-    X,Y,M,Ref = [[] for i in range(len(RR))], [[] for i in range(len(RR))],[[] for i in range(len(RR))],[[] for i in range(len(RR))]
+        data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchP(path_patches,reload_patches,interpolSize,method,D3,npatch)
+    
+    y_grp = ground_truth_processing(data, liste_patients, classes)
+    
+    X,Y,M,Ref = ([[] for i in range(len(list_pat_ref))], ) * 4 
+    
     for i in range(len(liste_ref)):
-        for k in range(len(RR)):
-            if liste_ref[i] in RR[k]:
+        for k in range(len(list_pat_ref)):
+            if liste_ref[i] in list_pat_ref[k]:
                 X[k].append(liste_patches[i])
                 M[k].append(liste_mask[i])
                 Ref[k].append(liste_ref[i])
-    print(np.shape(X[0]))
-    for k in range(len(RR)) :   
-        print(k)
-        if D3==False:
+
+    for k in range(len(list_pat_ref)) :   
+        if D3=='False':
             X[k] = dpr.normalize(np.expand_dims(np.array(X[k]),axis = 3)) 
             M[k] = dpr.normalize(np.expand_dims(np.array(M[k]),axis = 3)) 
+        
         else:
             X[k] = dpr.normalize(np.expand_dims(np.array(X[k]),axis = 4)) 
             M[k] = dpr.normalize(np.expand_dims(np.array(M[k]),axis = 4)) 
+        
         if classes != 'surv':
             Y[k] = to_categorical(np.asarray(y_grp.loc[Ref[k]]))
+        
         else:
             Y[k] = np.asarray(y_grp.loc[Ref[k]])
-    return X,Y,M,Ref
+            
+    return X, Y, M, Ref
 
   
-def conv_netFirst(size,D3=False,spp=True,maxi=False):
-    if not D3: 
+def conv_netFirst(size,D3 = 'False',spp=True,maxi=False):
+    if D3 == 'False': 
         if D3=='25':
             Third = 3
         else:
@@ -134,7 +179,7 @@ def conv_netFirst(size,D3=False,spp=True,maxi=False):
         model.add(LeakyReLU(alpha=0.1))
         model.add(InstanceNormalization())
 
-        if spp==False:
+        if not spp:
             model.add(AveragePooling2D(pool_size=(2,2))) # dephm 3 ou 2
         model.add(Conv2D(filters=32, kernel_size=5,
                                    strides=1, padding="same", input_shape=(size,size,Third), 
@@ -144,7 +189,7 @@ def conv_netFirst(size,D3=False,spp=True,maxi=False):
         model.add(LeakyReLU(alpha=0.1))
         #model.add(InstanceNormalization())
 
-        if spp==False:
+        if not spp:
             model.add(AveragePooling2D(pool_size=(2,2))) # dephm 3 ou 2    
             
         model.add(Conv2D(filters=64, kernel_size=3,
@@ -155,7 +200,7 @@ def conv_netFirst(size,D3=False,spp=True,maxi=False):
         model.add(LeakyReLU(alpha=0.1))
         #model.add(InstanceNormalization())
 
-        if spp==False:
+        if not spp:
             model.add(AveragePooling2D(pool_size=(2,2))) # dephm 3 ou 2
         
     else: 
@@ -167,14 +212,17 @@ def conv_netFirst(size,D3=False,spp=True,maxi=False):
                                    
         model.add(LeakyReLU(alpha=0.1))
         model.add(InstanceNormalization())
-        if spp==False:
+        
+        if not spp:
             model.add(AveragePooling3D(pool_size=(2,2,2))) # dephm 3 ou 2
         model.add(Conv3D(filters=32, kernel_size=5,
                                    strides=1, padding="same", input_shape=(size,size,Third,1), 
                                    name="conv2",kernel_regularizer=regularizers.l2(0.001)))
+        
         model.add(LeakyReLU(alpha=0.1))
         model.add(InstanceNormalization())
-        if spp==False:
+        
+        if not spp:
             model.add(AveragePooling3D(pool_size=(2,2,2)))    
         model.add(Conv3D(filters=64, kernel_size=3,
                                    strides=1, padding="same", input_shape=(size,size,Third,1), 
@@ -182,15 +230,17 @@ def conv_netFirst(size,D3=False,spp=True,maxi=False):
         model.add(LeakyReLU(alpha=0.1))
         model.add(InstanceNormalization())
         
-        if spp==False:
+        if not spp:
             model.add(AveragePooling3D(pool_size=(2,2,2)))    
+            
     return model  
 
-def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='False',rate=0.17,conv1 = False,maxi=False,l11 = 0.001): #box shape (B,4) box : (xmin,ymin, h,w)
-    if D3==False: 
+def deepConvSurv(interpolSize,num=3, mode = 'cox',D3 = 'False',spp=True,attention='False',rate=0.17,conv1 = False,maxi=False,l11 = 0.001): #box shape (B,4) box : (xmin,ymin, h,w)
+    if D3=='False': 
         input = Input(shape=(interpolSize, interpolSize, 1), name='input')
         mask = Input(shape=(interpolSize,interpolSize,1))
         modelCN = conv_netFirst(interpolSize,False,spp=spp,maxi=maxi)
+    
     elif D3=='25':
         input = Input(shape=(interpolSize, interpolSize, 3), name='input')
         mask = Input(shape=(interpolSize,interpolSize,3))
@@ -205,7 +255,7 @@ def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='F
     
     if spp == 'B4':
         spp21= Lambda(SPP4, name='spp')([output,mask]) 
-        if  D3==False:
+        if  D3=='False':
             numm = 1024            
             output = keras.layers.Reshape([4,4,64],name=('resh11'))(spp21)
 
@@ -215,7 +265,8 @@ def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='F
 
     elif spp == 'B42':
         spp21= Lambda(SPP, name='spp')([output,mask]) 
-        if  D3==False:
+        
+        if  D3=='False':
             numm = 1280
         elif D3=='25':
             numm = 1280
@@ -223,7 +274,7 @@ def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='F
             numm = 4608
             
         if attention != 'False':
-            if  D3==True:
+            if  D3=='True':
                 output = keras.layers.Reshape([8,8,8,9],name=('resh8889'))(spp21)
             else:                
                 output = keras.layers.Reshape([8,8,9],name=('resh8889'))(spp21)
@@ -232,16 +283,17 @@ def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='F
             output = keras.layers.Reshape([numm],name=('resh22'))(spp21)
             
     if attention != 'False':
-        if  D3==False or D3=='25':
+        if  D3=='False' or D3=='25':
             y = attach_attention_module(output, 'cbam_block',order=attention) #https://github.com/kobiso/CBAM-keras
         else:
             y = attach_attention_module3D(output, 'cbam_block',order=attention) #https://github.com/kobiso/CBAM-keras
+        
         x = keras.layers.add([output, y])
         output = keras.layers.Activation('relu')(x)
     
     if spp == 'A4':
         spp21= Lambda(SPP4, name='spp')([output,mask]) 
-        if  D3==False or D3=='25':
+        if  D3=='False' or D3=='25':
             numm = 1024
         else:
             numm = 4096
@@ -249,37 +301,40 @@ def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='F
 
     elif spp == 'A42':
         spp21= Lambda(SPP, name='spp')([output,mask]) 
-        if  D3==False:
+        if  D3=='False':
             numm = 1280
         elif D3=='25':
             numm = 1280
         else:
             numm = 4608
         output = keras.layers.Reshape([numm],name=('resh44'))(spp21)
+    
     elif spp == 'False' or spp == False:
-        if D3==False or D3=='25':
+        if D3=='False' or D3=='25':
             output = keras.layers.Reshape([K.int_shape(output)[1]*K.int_shape(output)[2]*K.int_shape(output)[3]],name=('resh48'))(output)
         else: #(?,46656)
             output = keras.layers.Reshape([K.int_shape(output)[1]*K.int_shape(output)[2]*K.int_shape(output)[3]*K.int_shape(output)[4]],name=('resh48'))(output)  
+    
     elif spp == 'B4' or spp=='B42':
-        if D3==False or D3=='25':
+        if D3=='False' or D3=='25':
             output = keras.layers.Reshape([K.int_shape(output)[1]*K.int_shape(output)[2]*K.int_shape(output)[3]],name=('resh55'))(output)
         else: #(?,46656)
             output = keras.layers.Reshape([K.int_shape(output)[1]*K.int_shape(output)[2]*K.int_shape(output)[3]*K.int_shape(output)[4]],name=('resh55'))(output)  
+    
     if mode == 'tripletAnddiscret' or mode == 'tripletAndcox' or mode == 'tripletContinueAndcox' :
         model2 = Dense(100, activation='softmax', name="triplet_output",kernel_regularizer=regularizers.l2(0.001))(output)
         
         
     if mode != 'triplet' :
-        if conv1 == False:
+        if not conv1:
             model = Dense(100, name="fc3",kernel_regularizer=regularizers.l2(0.01),
                           bias_initializer='zeros')(output)
         else:
-            if D3==True:
+            if D3=='True':
                 model = Conv3D(filters=64, kernel_size=1,
                           strides=1, padding="same", input_shape=(4,4,4,1), 
                           name="conv1b1",kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01))(output)
-            elif D3==False:
+            elif D3=='False':
                 model = Conv2D(filters=64, kernel_size=1,
                           strides=1, padding="same", input_shape=(4,4,1), 
                           name="conv1b1",kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01))(output)
@@ -290,8 +345,8 @@ def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='F
             
         model = LeakyReLU(alpha=0.1)(model)
         model = Dropout(rate = rate)(model)
-        if conv1==True:
-            if D3==True:
+        if conv1:
+            if D3=='True':
                 model = GlobalAveragePooling3D()(model)
             else:
                 model = GlobalAveragePooling2D()(model)
@@ -324,7 +379,6 @@ def deepConvSurv(interpolSize,num=3, mode = 'cox',D3=False,spp=True,attention='F
 
 
 
-
 def Prep25(x,m,y,r):
     x2=[]
     m2=[]
@@ -335,10 +389,10 @@ def Prep25(x,m,y,r):
     m2= np.array(m2).transpose(0,2,3,1,4)
     return x2, m2,y,r
 
-def PrepData(rtrain, rtest, rval,PATH,change=False,interpolSize=36,reload=True,classes='surv',D3=False,method='all',dataAug=0,npatch=9):
+def PrepData(rtrain, rtest, rval,PATH,interpolSize=36,reload_patches=True,classes='surv',D3 = 'False',method='all',dataAug=0,npatch=9):
         
-    data, liste_patches, liste_ref, liste_patients,errors,liste_mask = pf.patchP(PATH,reload,interpolSize,method,D3,npatch)
-    y_grp = pf.YProcessing(data,liste_patients,classes)
+    data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchP(PATH,reload_patches,interpolSize,method,D3,npatch)
+    y_grp = ground_truth_processing(data,liste_patients,classes)
     xtrain, reftr, xtest, refte , xval, refv, mtrain, mtest, mval =[],[],[],[],[],[],[],[],[]
     for i in range(len(liste_ref)):
         if liste_ref[i] in rtrain:
@@ -353,7 +407,7 @@ def PrepData(rtrain, rtest, rval,PATH,change=False,interpolSize=36,reload=True,c
             xval.append(liste_patches[i])
             mval.append(liste_mask[i])
             refv.append(liste_ref[i])
-    if D3==False:
+    if D3=='False':
 
         xtest = dpr.normalize(np.expand_dims(np.array(xtest),axis = 3)) 
         xtrain = dpr.normalize(np.expand_dims(np.array(xtrain),axis = 3))
@@ -404,7 +458,7 @@ def maxPool3DFixeSize(input,n,ksize, strides):
 def while_conditionF(i,output,new,box,bins):
     return tf.less(i, tf.shape(output)[0]) # surement None, a changer
 
-def SPP_Net(input, Pyramid_Levels,D3=False):
+def SPP_Net(input, Pyramid_Levels,D3 = 'False'):
     input_shape = tf.shape(input) # (14,14,3)
     pyramid_list=[]
     Pyramid = [2,4]
@@ -413,7 +467,7 @@ def SPP_Net(input, Pyramid_Levels,D3=False):
         stride_1 = tf.cast(tf.floor(tf.cast(input_shape[2] / n, tf.float32)),tf.int32)
         Kernel_size_0 = stride_0 + (input_shape[1] % n)
         Kernel_size_1 = stride_1 + (input_shape[2] % n)
-        if D3==False:
+        if D3=='False':
             pool = gen_nn_ops.max_pool_v2(input,
                                 ksize=[ 1,Kernel_size_0, Kernel_size_1, 1],
                                 strides=[1,stride_0, stride_1, 1],
@@ -429,7 +483,7 @@ def SPP_Net(input, Pyramid_Levels,D3=False):
     return spp_out_fixed_size
 
 
-def SPP_Net4(input, Pyramid_Levels,D3=False):
+def SPP_Net4(input, Pyramid_Levels,D3 = 'False'):
     input_shape = tf.shape(input) # (14,14,3)
     pyramid_list=[]
     Pyramid = [4]
@@ -438,7 +492,7 @@ def SPP_Net4(input, Pyramid_Levels,D3=False):
         stride_1 = tf.cast(tf.floor(tf.cast(input_shape[2] / n, tf.float32)),tf.int32)
         Kernel_size_0 = stride_0 + (input_shape[1] % n)
         Kernel_size_1 = stride_1 + (input_shape[2] % n)
-        if D3==False:
+        if D3=='False':
             pool = gen_nn_ops.max_pool_v2(input,
                                 ksize=[ 1,Kernel_size_0, Kernel_size_1, 1],
                                 strides=[1,stride_0, stride_1, 1],
@@ -501,10 +555,10 @@ def bodyF(i,output,new,mask,bins):
     
     if K.int_shape(mask)[3]==36 or K.int_shape(mask)[3]==28: 
         new2=tf.slice(output2,[0,xmin,ymin,zmin,0],[1,h2,w2,p2,K.int_shape(output2)[4]],name='new23D')
-        D3=True
+        D3 = 'True'
     else:
         new2=tf.slice(output2,[0,xmin,ymin,0],[1,h2,w2,K.int_shape(output2)[3]],name='new22D')
-        D3=False
+        D3 = 'False'
     new3=new2
     spp_out_fixed_size = SPP_Net(new3,bins,D3)
     g2=tf.cond(tf.equal(i,tf.constant(0)), lambda:spp_out_fixed_size, lambda:tf.concat([new,spp_out_fixed_size],axis=0 ) )
@@ -551,10 +605,10 @@ def bodyF4(i,output,new,mask,bins):
     
     if K.int_shape(mask)[3]==36 or K.int_shape(mask)[3]==28: 
         new2=tf.slice(output2,[0,xmin,ymin,zmin,0],[1,h2,w2,p2,K.int_shape(output2)[4]],name='new23D')
-        D3=True
+        D3 = 'True'
     else:
         new2=tf.slice(output2,[0,xmin,ymin,0],[1,h2,w2,K.int_shape(output2)[3]],name='new22D')
-        D3=False
+        D3 = 'False'
     new3=new2
     spp_out_fixed_size = SPP_Net4(new3,bins,D3)
     g2=tf.cond(tf.equal(i,tf.constant(0)), lambda:spp_out_fixed_size, lambda:tf.concat([new,spp_out_fixed_size],axis=0 ) )

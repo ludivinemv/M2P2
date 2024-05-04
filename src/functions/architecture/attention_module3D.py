@@ -7,17 +7,31 @@ from keras.layers import GlobalAveragePooling2D, GlobalMaxPooling2D, GlobalAvera
 from keras import backend as K
 from keras.activations import sigmoid
 
-def attach_attention_module3D(net, attention_module,order='cs'):
-  if attention_module == 'se_block': # SE_block
-      net = se_block(net)
-  elif attention_module == 'cbam_block': # CBAM_block
-      net = cbam_block(net,order=order)
-  else:
-      raise Exception("'{}' is not supported attention module!".format(attention_module))
+from typing import Any
 
-  return net
+def attach_attention_module3D(net: Any, attention_module: str, order:str = 'cs'):
+    """Select the attention module
 
-def se_block(input_feature, ratio=8):
+	Args:
+		net (Any): neural network to attach the attention module
+		attention_module (str, optional): to select the type of block
+		order (str, optional): to select the order of the CBAM block. Defaults to 'cs'.
+
+	Returns:
+		net (Any): network with the attention block added
+	"""
+	if attention_module == 'se_block': # SE_block
+		net = se_block(net)
+		
+	elif attention_module == 'cbam_block': # CBAM_block
+		net = cbam_block(net, order = order)
+		
+	else:
+		raise Exception(f"{attention_module} is not supported attention module!")
+
+	return net
+
+def se_block(input_feature: Any, ratio: int=8):
 	"""Contains the implementation of Squeeze-and-Excitation(SE) block.
 	As described in https://arxiv.org/abs/1709.01507.
 	"""
@@ -27,44 +41,67 @@ def se_block(input_feature, ratio=8):
 
 	se_feature = GlobalAveragePooling2D()(input_feature)
 	se_feature = Reshape((1, 1, channel))(se_feature)
+ 
 	assert se_feature._keras_shape[1:] == (1,1,channel)
+ 
 	se_feature = Dense(channel // ratio,
 					   activation='relu',
 					   kernel_initializer='he_normal',
 					   use_bias=True,
 					   bias_initializer='zeros')(se_feature)
+ 
 	assert se_feature._keras_shape[1:] == (1,1,channel//ratio)
+ 
 	se_feature = Dense(channel,
 					   activation='sigmoid',
 					   kernel_initializer='he_normal',
 					   use_bias=True,
 					   bias_initializer='zeros')(se_feature)
+ 
 	assert se_feature._keras_shape[1:] == (1,1,channel)
+ 
 	if K.image_data_format() == 'channels_first':
 		se_feature = Permute((3, 1, 2))(se_feature)
 
 	se_feature = multiply([input_feature, se_feature])
+ 
 	return se_feature
 
-def cbam_block(cbam_feature, ratio=8,order='cs'):
-	#"""Contains the implementation of Convolutional Block Attention Module(CBAM) block.
-	#As described in https://arxiv.org/abs/1807.06521.
-	#"""
+def cbam_block(cbam_feature: Any, ratio: int = 8, order='cs'):
+	"""Contains the implementation of Convolutional Block Attention Module(CBAM) block.
+		As described in https://arxiv.org/abs/1807.06521.
 	
-    if order == 'cs':
-        cbam_feature = channel_attention(cbam_feature, ratio)
-        cbam_feature = spatial_attention(cbam_feature)
-    elif order=='c':
-        cbam_feature = channel_attention(cbam_feature, ratio)
-    elif order=='s':
-        cbam_feature = spatial_attention(cbam_feature)
-    else:        
-        cbam_feature = spatial_attention(cbam_feature)
-        cbam_feature = channel_attention(cbam_feature, ratio)
-    return cbam_feature
+	Args:
+		cbam_feature (Any): Input
+		ratio (int, optional): ratio. Default = 8.
+		order (str, optional): to select the order of the CBAM block. If cs use chanel first, if s use only spatial, if c use only chanel.Defaults to 'cs'.
 
-def channel_attention(input_feature, ratio=8):
-	
+	Returns:
+		net (Any): network with the attention block added
+	"""
+
+	if order == 'cs':
+		cbam_feature = channel_attention(cbam_feature, ratio)
+		cbam_feature = spatial_attention(cbam_feature)
+  
+	elif order=='c':
+		cbam_feature = channel_attention(cbam_feature, ratio)
+  
+	elif order=='s':
+		cbam_feature = spatial_attention(cbam_feature)
+	else:        
+		cbam_feature = spatial_attention(cbam_feature)
+		cbam_feature = channel_attention(cbam_feature, ratio)
+	return cbam_feature
+
+
+def channel_attention(input_feature: Any, ratio: int = 8):
+	"""Define the channel attention
+
+	Args:
+		input_feature (Any): Input
+		ratio (int, optional): Ratio. Defaults to 8.
+	"""
 	channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 	channel = input_feature._keras_shape[channel_axis]
 	
@@ -80,17 +117,22 @@ def channel_attention(input_feature, ratio=8):
 	
 	avg_pool = GlobalAveragePooling3D()(input_feature)    
 	avg_pool = Reshape((1,1,1,channel))(avg_pool)
+ 
 	assert avg_pool._keras_shape[1:] == (1,1,1,channel)
+ 
 	avg_pool = shared_layer_one(avg_pool)
 	assert avg_pool._keras_shape[1:] == (1,1,1,channel//ratio)
-	avg_pool = shared_layer_two(avg_pool)
+ 
+ 	avg_pool = shared_layer_two(avg_pool)
 	assert avg_pool._keras_shape[1:] == (1,1,1,channel)
 	
 	max_pool = GlobalMaxPooling3D()(input_feature)
 	max_pool = Reshape((1,1,1,channel))(max_pool)
 	assert max_pool._keras_shape[1:] == (1,1,1,channel)
+ 
 	max_pool = shared_layer_one(max_pool)
 	assert max_pool._keras_shape[1:] == (1,1,1,channel//ratio)
+ 
 	max_pool = shared_layer_two(max_pool)
 	assert max_pool._keras_shape[1:] == (1,1,1,channel)
 	
@@ -103,29 +145,40 @@ def channel_attention(input_feature, ratio=8):
 	return multiply([input_feature, cbam_feature])
 
 
-def spatial_attention(input_feature):
+def spatial_attention(input_feature: Any):
+    """Define the spatial attention
+
+	Args:
+		input_feature (Any): Input
+
+	"""
 	kernel_size = 7
 	
 	if K.image_data_format() == "channels_first":
 		channel = input_feature._keras_shape[1]
 		cbam_feature = Permute((2,3,1))(input_feature)
+  
 	else:
 		channel = input_feature._keras_shape[-1]
 		cbam_feature = input_feature
 	
 	avg_pool = Lambda(lambda x: K.mean(x, axis=4, keepdims=True))(cbam_feature)
 	assert avg_pool._keras_shape[-1] == 1
+ 
 	max_pool = Lambda(lambda x: K.max(x, axis=4, keepdims=True))(cbam_feature)
 	assert max_pool._keras_shape[-1] == 1
+ 
 	concat = Concatenate(axis=4)([avg_pool, max_pool])
 	assert concat._keras_shape[-1] == 2
+ 
 	cbam_feature = Conv3D(filters = 1,
 					kernel_size=kernel_size,
 					strides=1,
 					padding='same',
 					activation='sigmoid',
 					kernel_initializer='he_normal',
-					use_bias=False,name='spatial_attention_weight')(concat)	
+					use_bias=False,name='spatial_attention_weight')(concat)
+ 	
 	assert cbam_feature._keras_shape[-1] == 1
 	
 	if K.image_data_format() == "channels_first":

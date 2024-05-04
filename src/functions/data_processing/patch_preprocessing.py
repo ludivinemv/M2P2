@@ -23,24 +23,24 @@ from data_processing import *
 #import matplotlib.pyplot as plt
 class patch_preprocessing:
 
-    def __init__(self, PATH,interS,method='box',reload=True,D3=False,npatch=9,nameI='image.tif',sess=None):
+    def __init__(self, PATH,interS,method='box',reload_patches=True,D3='False',npatch=9,nameI='image.tif',sess=None):
         self.interS = interS
         self.method = method
-        self.reload = reload
+        self.reload_patches = reload_patches
         self.D3 = D3
         self.npatch=npatch
         self.nameI=nameI
         self.sess=sess
         if nameI=='image.tif':
-            self.data, self.liste_patches, self.liste_ref, self.liste_patients, self.errors,self.liste_mask = processing_patches(PATH,self.interS, self.method,self.reload,self.D3,self.npatch,self.nameI,self.sess)
+            self.data, self.liste_patches, self.liste_ref, self.liste_patients, self.errors,self.liste_mask = processing_patches(PATH,self.interS, self.method,self.reload_patches,self.D3,self.npatch,self.nameI,self.sess)
         else:
-            self.data, self.liste_patches, self.liste_ref, self.liste_patients, self.errors,self.liste_mask = processing_patchesHN(sess,PATH,self.interS, self.method,self.reload,self.D3,self.npatch,self.nameI)
+            self.data, self.liste_patches, self.liste_ref, self.liste_patients, self.errors,self.liste_mask = processing_patchesHN(sess,PATH,self.interS, self.method,self.reload_patches,self.D3,self.npatch,self.nameI)
 
 """###############################################################################
 ######################### Interpolation       ####################################
 ###############################################################################"""
 
-def interpolation(liste_patches,liste_ref,imageShow,interpolSize,D3=False):
+def interpolation(liste_patches,liste_ref,imageShow,interpolSize,D3='False'):
     if interpolSize != None:
         liste_interpolate = []
         for i in range(len(liste_patches)):
@@ -52,7 +52,7 @@ def interpolation(liste_patches,liste_ref,imageShow,interpolSize,D3=False):
     else :
         return liste_patches
     
-def AllSize_patches(np_image,mask,interS, D3=False,npatch=9): #k the size/2 of the patches 
+def AllSize_patches(np_image,mask,interS, D3='False',npatch=9): #k the size/2 of the patches 
         """ crop des patchs de 36x36"""
         l_patch, l_mask=[], []
         #récupérer 3 patchs par lésions
@@ -77,7 +77,7 @@ def AllSize_patches(np_image,mask,interS, D3=False,npatch=9): #k the size/2 of t
 
         New_im = np_image[L[0]:R[0],L[1]:R[1],L[2]:R[2]]
         New_mask = mask[L[0]:R[0],L[1]:R[1],L[2]:R[2]]
-        if D3==False: 
+        if D3=='False': 
             aa=np.where(New_mask != 0)
             for d in range(3):                
                 if npatch !=1 or (npatch==1 and d==0):
@@ -120,7 +120,7 @@ def AllSize_patches(np_image,mask,interS, D3=False,npatch=9): #k the size/2 of t
             l_mask.append(New_mask)
         return l_patch, l_mask
  
-def patches(np_image,mask,D3=False,npatch=9): #k the size/2 of the patches 
+def patches(np_image,mask,D3='False',npatch=9): #k the size/2 of the patches 
         l_patch=[]  
         l_mask=[]
         #récupérer 3 patchs par lésions
@@ -193,9 +193,9 @@ def patches(np_image,mask,D3=False,npatch=9): #k the size/2 of the patches
 
         return l_patch,l_mask
 
-def processing_patches(PATH,interS,method,reload,D3=False,npatch=9,nameI='image.tif',sess=None):
+def processing_patches(PATH,interS,method,reload_patches,D3='False',npatch=9,nameI='image.tif',sess=None):
     ''' for each patient '''
-    filename = "./output.csv"
+    filename = "output.csv"
     data = pd.read_csv(filename,sep=';',names=['patient','event','time'])
     patient = list(data.loc[:,'patient'])
     for i in range(len(data.loc[:,'patient'])):
@@ -209,7 +209,7 @@ def processing_patches(PATH,interS,method,reload,D3=False,npatch=9,nameI='image.
             list_files = [file for file in os.listdir(os.path.join(PATH,refPatient))]
             if 'dcm'  in list_files and 'max' in list_files:
                 try:
-                    if nameI not in list_files or reload == False:
+                    if nameI not in list_files or reload_patches == False:
                         patient = Patient(refPatient, PATH)
                         correct = patient.correct
                         image = patient.image
@@ -220,18 +220,18 @@ def processing_patches(PATH,interS,method,reload,D3=False,npatch=9,nameI='image.
                         correct = correction(refPatient)
                         np_image = io.imread(os.path.join(PATH,refPatient,nameI)).T
                     
-                    if 'max.tif' not in list_files or reload == False:
+                    if 'max.tif' not in list_files or reload_patches == False:
                         pathToAll=uf.makeTifFromPile(os.path.join(PATH,refPatient, "max"),correct)
                         mask = io.imread(pathToAll).T
                     else:
                         m_Path = os.path.join(PATH,refPatient, "max.tif")
                         mask = io.imread(m_Path).T
                     a=np.where(mask != 0)
-                    if D3== True: 
+                    if D3== 'True': 
                         p_Path = os.path.join(PATH,refPatient, "patch3D",method,str(npatch))
                     else:
                         p_Path = os.path.join(PATH,refPatient, "patch",method,str(npatch))
-                    if os.path.exists(p_Path)  and reload == True:
+                    if os.path.exists(p_Path)  and reload_patches :
                         lp=os.listdir(p_Path)
                         for i in lp:
                             if i[0]=='I':
@@ -254,7 +254,7 @@ def processing_patches(PATH,interS,method,reload,D3=False,npatch=9,nameI='image.
                                     for i in range(len(l_patch)):
                                         liste_patches.append(l_patch[i])
                                         liste_mask.append(l_mask[i])
-                                        if D3==False:
+                                        if D3=='False':
                                             image = Image.fromarray(l_patch[i])
                                             mask = Image.fromarray(l_mask[i])
                                             os.makedirs(p_Path, exist_ok=True) 
@@ -289,7 +289,7 @@ def processing_patches(PATH,interS,method,reload,D3=False,npatch=9,nameI='image.
     liste_ref=np.array(liste_ref)
 
     if method == 'box': 
-        if D3==True:
+        if D3=='True':
             liste_interpolate = uf.interpolation3D_MS(liste_patches,interS,'3D',sess=sess)
             liste_maskinterpolate = uf.interpolation3D_MS(liste_mask,interS,'3D',sess=sess)
 

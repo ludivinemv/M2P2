@@ -218,12 +218,12 @@ def all_patch(mask,k, pourcent_ratio, nb_patch,nim,pd_image,pd_mask):
     return liste_patch, liste_patch_value, liste_patch_coord
 
 
-def binary_extraction(RR,CrossVal,PATH,sess,TEST=False, interpolSize=36):
+def binary_extraction(list_pat_ref,CrossVal,PATH,sess,TEST=False, interpolSize=36):
     if CrossVal== False:
         print("import binary")
-        rtrainB = np.load('./Results/PATIENTS_SEP_TO_KEEP_154/Balance.npy')
-        rvalB = np.load('./Results/PATIENTS_SEP_TO_KEEP_154/Aval.npy')
-        rtestB = np.load('./Results/PATIENTS_SEP_TO_KEEP_154/Ate.npy')
+        rtrainB = np.load(os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Balance.npy'))
+        rvalB = np.load((os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Aval.npy'))
+        rtestB = np.load((os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Ate.npy'))
         print(' .............. TRAIN LIST CREATION ...............................')     
         xbitrain3D, ybitrain3D=mds.create_train(rtrainB,4, 0.4, 10,PATH)
         xbitrain3D, ybitrain3D = dpr.shuffle_and_interpolate(xbitrain3D, ybitrain3D,interpolSize,ThirdDim = '3D',sess=sess)
@@ -273,34 +273,34 @@ def binary_extraction(RR,CrossVal,PATH,sess,TEST=False, interpolSize=36):
         xbival2D, ybival2D = shuffle(xbival2D,ybival2D)
         return xbitrain2D, ybitrain2D, xbival2D,ybival2D
     else:
-        # rrB = np.delete(RR,f)
-        Xb2D, Yb2D= [[] for i in range(len(RR))],[[] for i in range(len(RR))]
-        Xb3D, Yb3D = [[] for i in range(len(RR))],[[] for i in range(len(RR))]
+        # rrB = np.delete(list_pat_ref,f)
+        Xb2D, Yb2D= [[] for i in range(len(list_pat_ref))],[[] for i in range(len(list_pat_ref))]
+        Xb3D, Yb3D = [[] for i in range(len(list_pat_ref))],[[] for i in range(len(list_pat_ref))]
         print('calculate binary patches')
-        for k in range(len(RR)):
+        for k in range(len(list_pat_ref)):
             print(k)
-            rvalB = RR[k]
-            if TEST==True:
+            rvalB = list_pat_ref[k]
+            if TEST:
                 if k==0:
-                    rtrainB=[RR[1],RR[2],RR[3],RR[4]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[3],list_pat_ref[4]]
                 elif k==1:
-                    rtrainB=[RR[0],RR[2],RR[3],RR[4]]
+                    rtrainB=[list_pat_ref[0],list_pat_ref[2],list_pat_ref[3],list_pat_ref[4]]
                 elif k==2:
-                    rtrainB=[RR[1],RR[0],RR[3],RR[4]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[3],list_pat_ref[4]]
                 elif k==3:
-                    rtrainB=[RR[1],RR[0],RR[2],RR[4]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[2],list_pat_ref[4]]
                 else:
-                    rtrainB=[RR[1],RR[2],RR[0],RR[3]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[0],list_pat_ref[3]]
                 rtrainB=np.concatenate((rtrainB[0],rtrainB[1],rtrainB[2],rtrainB[3]))
             else:
                 if k==0:
-                    rtrainB=[RR[1],RR[2],RR[3]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[3]]
                 elif k==1:
-                    rtrainB=[RR[0],RR[2],RR[3]]
+                    rtrainB=[list_pat_ref[0],list_pat_ref[2],list_pat_ref[3]]
                 elif k==2:
-                    rtrainB=[RR[1],RR[0],RR[3]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[3]]
                 else:
-                    rtrainB=[RR[1],RR[0],RR[2]]
+                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[2]]
                 rtrainB=np.concatenate((rtrainB[0],rtrainB[1],rtrainB[2]))
             
             
