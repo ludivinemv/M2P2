@@ -96,7 +96,7 @@ def patchP(PATH,reload_patches,interS,method='all',D3='False',npatch=9,sess=None
 ######################### y processing ####################################
 ###############################################################################"""
    
-def YProcessing(data,liste_patients,classes):    
+def ground_truth_processing(data,liste_patients,classes):    
     y = data.copy()
     
     for pat in data.index:

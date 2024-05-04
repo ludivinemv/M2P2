@@ -510,36 +510,36 @@ if __name__ == "__main__":
                                     mval = np.reshape(xval,(xval.shape[0],xval.shape[1],xval.shape[2],xval.shape[3]))
         
                                 if loss == 'classif':
-                                    ytrain_grp = dpr.YProcessing2(ytrain,nb_classes)
-                                    yval_grp = dpr.YProcessing2(yval,nb_classes)
+                                    ytrain_grp = dpr.ground_truth_processing2(ytrain,nb_classes)
+                                    yval_grp = dpr.ground_truth_processing2(yval,nb_classes)
                                     if p.use_test_set:
-                                        ytest_grp = dpr.YProcessing2(ytest,nb_classes)
+                                        ytest_grp = dpr.ground_truth_processing2(ytest,nb_classes)
                                         
                                 elif loss == 'triplet':
-                                    ytrain_grp = np.transpose(np.concatenate(([ytrain[:,0]],[np.argmax(dpr.YProcessing2(ytrain,nb_classes),axis=1)]),axis=0))
-                                    yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.YProcessing2(yval,nb_classes),axis=1)]),axis=0))
+                                    ytrain_grp = np.transpose(np.concatenate(([ytrain[:,0]],[np.argmax(dpr.ground_truth_processing2(ytrain,nb_classes),axis=1)]),axis=0))
+                                    yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.ground_truth_processing2(yval,nb_classes),axis=1)]),axis=0))
                                     if p.use_test_set:
-                                        ytest_grp =np.transpose(np.concatenate(([ytest[:,0]],[np.argmax(dpr.YProcessing2(ytest,nb_classes),axis=1)]),axis=0))
+                                        ytest_grp =np.transpose(np.concatenate(([ytest[:,0]],[np.argmax(dpr.ground_truth_processing2(ytest,nb_classes),axis=1)]),axis=0))
                                 else:
-                                    ytrain_grp = uf.YProcessing4(ytrain,'YEAR')
-                                    yval_grp = uf.YProcessing4(yval,'YEAR')
+                                    ytrain_grp = uf.ground_truth_processing4(ytrain,'YEAR')
+                                    yval_grp = uf.ground_truth_processing4(yval,'YEAR')
                                     if p.use_test_set:
-                                        ytest_grp = uf.YProcessing4(ytest,'YEAR')
+                                        ytest_grp = uf.ground_truth_processing4(ytest,'YEAR')
                                         
-                                    ytrain_grpwc = uf.YProcessing4(ytrain,'YEARWC')
-                                    yval_grpwc = uf.YProcessing4(yval,'YEARWC')
+                                    ytrain_grpwc = uf.ground_truth_processing4(ytrain,'YEARWC')
+                                    yval_grpwc = uf.ground_truth_processing4(yval,'YEARWC')
                                     if p.use_test_set:
-                                        ytest_grpwc = uf.YProcessing4(ytest,'YEARWC')
+                                        ytest_grpwc = uf.ground_truth_processing4(ytest,'YEARWC')
                                         
-                                    ytrain_grp3 = uf.YProcessing4(ytrain,'THREE')
-                                    yval_grp3 = uf.YProcessing4(yval,'THREE')
+                                    ytrain_grp3 = uf.ground_truth_processing4(ytrain,'THREE')
+                                    yval_grp3 = uf.ground_truth_processing4(yval,'THREE')
                                     if p.use_test_set:
-                                        ytest_grp3 = uf.YProcessing4(ytest,'THREE')
+                                        ytest_grp3 = uf.ground_truth_processing4(ytest,'THREE')
                                         
-                                    ytrain_grpwc3 = uf.YProcessing4(ytrain,'THREEWC')
-                                    yval_grpwc3 = uf.YProcessing4(yval,'THREEWC')
+                                    ytrain_grpwc3 = uf.ground_truth_processing4(ytrain,'THREEWC')
+                                    yval_grpwc3 = uf.ground_truth_processing4(yval,'THREEWC')
                                     if p.use_test_set:
-                                        ytest_grpwc3 = uf.YProcessing4(ytest,'THREEWC')
+                                        ytest_grpwc3 = uf.ground_truth_processing4(ytest,'THREEWC')
                                     
                                 if loss=='discret' or loss == 'RankAnddiscret':
                                     if p.use_test_set:
@@ -571,13 +571,13 @@ if __name__ == "__main__":
                                 pred =  BilinearModel(p.interpolation_size,modelCN = model_cnn,model_cnn_2 = model_cnn_2, mode = loss,D3=D3,spp=spp,attention=attention,num=nb_classes)
                             else: 
                                 if pretrain == 'triplet':
-                                    # pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=param_tri_rate,conv1=conv_1,maxi = Maxi)  
-                                    pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
+                                    # pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=param_tri_rate,conv1=conv_1)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = 'triplet',D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,l11=l2reg)  
 
                                 elif pretrain == 'binary':
-                                    pred = deepConvSurv(p.interpolation_size,mode = 'classif',D3=D3,spp=spp,attention=attention,num=2,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = 'classif',D3=D3,spp=spp,attention=attention,num=2,rate=rate,conv1=conv_1,l11=l2reg)  
                                 else:
-                                    pred = deepConvSurv(p.interpolation_size,mode = loss ,D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,maxi = Maxi,l11=l2reg)  
+                                    pred = deepConvSurv(p.interpolation_size,mode = loss ,D3=D3,spp=spp,attention=attention,num=nb_classes,rate=rate,conv1=conv_1,l11=l2reg)  
 
                             ''' *****************************************'''
                             ''' **************PRETRAINING****************'''
@@ -1023,14 +1023,14 @@ if __name__ == "__main__":
                                     yvalL=  uf.FromTimeToLong(yval,breaks)
                                     yvalT =  yval
                                     if loss == 'classif':
-                                        yval_grp = dpr.YProcessing2(yval,nb_classes)
+                                        yval_grp = dpr.ground_truth_processing2(yval,nb_classes)
                                     elif loss == 'triplet':
-                                        yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.YProcessing2(yval,nb_classes),axis=1)]),axis=0))
+                                        yval_grp = np.transpose(np.concatenate(([yval[:,0]],[np.argmax(dpr.ground_truth_processing2(yval,nb_classes),axis=1)]),axis=0))
                                     else:
-                                        yval_grp = uf.YProcessing4(yval,'YEAR')
-                                        yval_grpwc = uf.YProcessing4(yval,'YEARWC')
-                                        yval_grp3 = uf.YProcessing4(yval,'THREE')
-                                        yval_grpwc3 = uf.YProcessing4(yval,'THREEWC')
+                                        yval_grp = uf.ground_truth_processing4(yval,'YEAR')
+                                        yval_grpwc = uf.ground_truth_processing4(yval,'YEARWC')
+                                        yval_grp3 = uf.ground_truth_processing4(yval,'THREE')
+                                        yval_grpwc3 = uf.ground_truth_processing4(yval,'THREEWC')
                                     
                                     if loss =='discret'or loss=='RankAnddiscret':    
                                         ax=predictionShow('valgrp',yvalT,np.reshape(np.array(predictionval),(-1,1)),writer)

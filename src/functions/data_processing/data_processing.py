@@ -354,12 +354,12 @@ def read_output():
 
 
 
-def interpolation3D(liste_patch,interpolSize,ThirdDim=3,sess=None):
+def interpolation3D(liste_patch,interpolSize,third_dim=3,sess=None):
     """  Resize images in liste_patch with the size interpolSize and interpolate"""
     if interpolSize != None:
         liste_interpolate = []
         print('interpolation')
-        if ThirdDim!= '3D':
+        if third_dim!= '3D':
             for i in range(len(liste_patch)): 
                 im=sitk.GetImageFromArray(np.array(liste_patch[i]))
                 resampleImageFilter = sitk.ExpandImageFilter()
@@ -367,7 +367,7 @@ def interpolation3D(liste_patch,interpolSize,ThirdDim=3,sess=None):
                 resampleImageFilter.SetInterpolator(sitk.sitkBSplineResamplerOrder2)
                 resultedImage = resampleImageFilter.Execute(im)
                 im2= sitk.GetArrayFromImage(resultedImage)
-            if ThirdDim == 3:
+            if third_dim == 3:
                 im2 = np.array(im2)[:,:,interpolSize//2-1:interpolSize//2+2]
             liste_interpolate.append(im2)
         else:
@@ -381,7 +381,7 @@ def interpolation3D(liste_patch,interpolSize,ThirdDim=3,sess=None):
     else :
         return liste_patch
     
-def shuffle_and_interpolate(liste_patch, liste_y,liste_ref,interpolSize,interStatue=True,liste_mask=[],ThirdDim=3,sess = None):
+def shuffle_and_interpolate(liste_patch, liste_y,liste_ref,interpolSize,interStatue=True,liste_mask=[],third_dim=3,sess = None):
     """ Interpolate a list of images and shuffle with the true values vector (y) associated. 
     
     If interStatue = True, interpolation"""
@@ -392,7 +392,7 @@ def shuffle_and_interpolate(liste_patch, liste_y,liste_ref,interpolSize,interSta
     liste_y=np.array(liste_y)
     
     if interStatue :
-        liste_patch = interpolation3D(liste_patch,interpolSize,ThirdDim,sess=sess)
+        liste_patch = interpolation3D(liste_patch,interpolSize,third_dim,sess=sess)
 
     x = np.arange(0,len(liste_y))
     random.shuffle(x)
@@ -413,7 +413,7 @@ def shuffle_and_interpolate(liste_patch, liste_y,liste_ref,interpolSize,interSta
         return sp,sy,sr
 
 
-def shuffle_and_interpolate2(liste_patch, liste_y,interpolSize,interStatue=True,liste_mask=[],ThirdDim=3,sess = None):
+def shuffle_and_interpolate2(liste_patch, liste_y,interpolSize,interStatue=True,liste_mask=[],third_dim=3,sess = None):
     """ Interpolate a list of images and shuffle with the y associated. 
     If interStatue = True, interpolation.
     The same than shuffle_and_interpolate() but without liste_ref as input"""
@@ -423,7 +423,7 @@ def shuffle_and_interpolate2(liste_patch, liste_y,interpolSize,interStatue=True,
     liste_y=np.array(liste_y)
     
     if interStatue :
-        liste_patch = interpolation3D(liste_patch,interpolSize,ThirdDim,sess=sess)
+        liste_patch = interpolation3D(liste_patch,interpolSize,third_dim,sess=sess)
 
     x = np.arange(0,len(liste_y))
     random.shuffle(x)
