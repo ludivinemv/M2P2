@@ -70,29 +70,29 @@ def getWords(text):
     return re.compile('\w+').findall(text)
 
 
-def ConvSurvBefore(interpolSize:int, D3:str = 'False', spp:bool = True): #box shape (B,4) box : (xmin,ymin, h,w)
+def ConvSurvBefore(interpolation_size:int, D3:str = 'False', spp:bool = True): #box shape (B,4) box : (xmin,ymin, h,w)
     """Create the base model
 
     Args:
-        interpolSize (int): size of the input
+        interpolation_size (int): size of the input
         D3 (str, optional): If True, the input is 3D, if False the input is 2D, if 25 the input is a stack of 3 2D images Defaults to False.
         spp (bool, optional): If True, use SPP block. Defaults to True.
 
     """
     if D3=='False': 
-        input = Input(shape=(interpolSize, interpolSize, 1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,1))
-        modelCN = conv_netFirst(interpolSize,False,spp=spp)
+        input = Input(shape=(interpolation_size, interpolation_size, 1), name='input')
+        mask = Input(shape=(interpolation_size,interpolation_size,1))
+        modelCN = conv_netFirst(interpolation_size,False,spp=spp)
         
     elif D3=='25': 
-        input = Input(shape=(interpolSize, interpolSize, 3,1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,3,1))
-        modelCN = conv_netFirst(interpolSize,True,spp=spp)
+        input = Input(shape=(interpolation_size, interpolation_size, 3,1), name='input')
+        mask = Input(shape=(interpolation_size,interpolation_size,3,1))
+        modelCN = conv_netFirst(interpolation_size,True,spp=spp)
         
     else:
-        input = Input(shape=(interpolSize, interpolSize, interpolSize,1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,interpolSize,1))
-        modelCN = conv_netFirst(interpolSize,True,spp=spp)
+        input = Input(shape=(interpolation_size, interpolation_size, interpolation_size,1), name='input')
+        mask = Input(shape=(interpolation_size,interpolation_size,interpolation_size,1))
+        modelCN = conv_netFirst(interpolation_size,True,spp=spp)
         
     output = modelCN(input) 
     
@@ -107,7 +107,7 @@ def ConvSurvBefore(interpolSize:int, D3:str = 'False', spp:bool = True): #box sh
   
 def PrepDataCrossVal(list_pat_ref:list,
                      path_patches: Path, 
-                     interpolSize:int = 36,
+                     interpolation_size:int = 36,
                      reload_patches: bool = True, 
                      classes:str = 'surv',
                      D3:str = 'False',
@@ -120,7 +120,7 @@ def PrepDataCrossVal(list_pat_ref:list,
     Args:
         list_pat_ref (list): list of patients
         path_patches (Path): path to the patches
-        interpolSize (int, optional):  size of the input. Defaults to 36.
+        interpolation_size (int, optional):  size of the input. Defaults to 36.
         reload_patches (bool, optional): reload patches. Defaults to True.
         classes (str, optional): type of ground truth. Defaults to 'surv'.
         D3 (str, optional): If True, the input is 3D, if False the input is 2D, if 25 the input is a stack of 3 2D images Defaults to False.
@@ -131,9 +131,9 @@ def PrepDataCrossVal(list_pat_ref:list,
 
     """
     if dataset == 'hn':
-        data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchPHN(path_patches,reload_patches,interpolSize,method,D3,npatch,dataset='hn')
+        data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchPHN(path_patches,reload_patches,interpolation_size,method,D3,npatch,dataset='hn')
     else:
-        data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchP(path_patches,reload_patches,interpolSize,method,D3,npatch)
+        data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchP(path_patches,reload_patches,interpolation_size,method,D3,npatch)
     
     y_grp = ground_truth_processing(data, liste_patients, classes)
     
@@ -243,7 +243,7 @@ def conv_netFirst(size: int, D3 = 'False', spp:bool = True):
     return model  
 
 
-def deepConvSurv(interpolSize:int,
+def deepConvSurv(interpolation_size:int,
                  num:int = 3, 
                  mode:str = 'cox',
                  D3 = 'False',
@@ -255,7 +255,7 @@ def deepConvSurv(interpolSize:int,
     """_summary_
 
     Args:
-        interpolSize (int): _description_
+        interpolation_size (int): _description_
         num (int, optional): _description_. Defaults to 3.
         mode (str, optional): _description_. Defaults to 'cox'.
         D3 (str, optional): _description_. Defaults to 'False'.
@@ -269,19 +269,19 @@ def deepConvSurv(interpolSize:int,
         _type_: _description_
     """
     if D3=='False': 
-        input = Input(shape=(interpolSize, interpolSize, 1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,1))
-        modelCN = conv_netFirst(interpolSize,False,spp=spp)
+        input = Input(shape=(interpolation_size, interpolation_size, 1), name='input')
+        mask = Input(shape=(interpolation_size,interpolation_size,1))
+        modelCN = conv_netFirst(interpolation_size,False,spp=spp)
     
     elif D3=='25':
-        input = Input(shape=(interpolSize, interpolSize, 3), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,3))
-        modelCN = conv_netFirst(interpolSize,'25',spp=spp)
+        input = Input(shape=(interpolation_size, interpolation_size, 3), name='input')
+        mask = Input(shape=(interpolation_size,interpolation_size,3))
+        modelCN = conv_netFirst(interpolation_size,'25',spp=spp)
         
     else: 
-        input = Input(shape=(interpolSize, interpolSize, interpolSize,1), name='input')
-        mask = Input(shape=(interpolSize,interpolSize,interpolSize,1))
-        modelCN = conv_netFirst(interpolSize,True,spp=spp)
+        input = Input(shape=(interpolation_size, interpolation_size, interpolation_size,1), name='input')
+        mask = Input(shape=(interpolation_size,interpolation_size,interpolation_size,1))
+        modelCN = conv_netFirst(interpolation_size,True,spp=spp)
     
     output = modelCN(input) 
     
@@ -426,9 +426,9 @@ def Prep25(x, m, y, r):
     
     return x2, m2, y, r
 
-def PrepData(rtrain, rtest, rval,PATH,interpolSize=36,reload_patches=True,classes='surv',D3 = 'False',method='all',dataAug=0,npatch=9):
+def PrepData(rtrain, rtest, rval,PATH,interpolation_size=36,reload_patches=True,classes='surv',D3 = 'False',method='all',dataAug=0,npatch=9):
         
-    data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchP(PATH,reload_patches,interpolSize,method,D3,npatch)
+    data, liste_patches, liste_ref, liste_patients,errors,liste_mask = patchP(PATH,reload_patches,interpolation_size,method,D3,npatch)
     y_grp = ground_truth_processing(data,liste_patients,classes)
     xtrain, reftr, xtest, refte , xval, refv, mtrain, mtest, mval =([],)*9
     

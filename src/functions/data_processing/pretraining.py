@@ -8,6 +8,7 @@ Functions used for the pretraining methods
 """
 import os
 import random
+import copy
 import tensorflow as tf
 import tensorflow.keras.backend as K
 import SimpleITK as sitk
@@ -218,134 +219,98 @@ def all_patch(mask,k, pourcent_ratio, nb_patch,nim,pd_image,pd_mask):
     return liste_patch, liste_patch_value, liste_patch_coord
 
 
-def binary_extraction(list_pat_ref,CrossVal,PATH,sess,TEST=False, interpolSize=36):
-    if CrossVal== False:
-        print("import binary")
-        rtrainB = np.load(os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Balance.npy'))
-        rvalB = np.load((os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Aval.npy'))
-        rtestB = np.load((os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Ate.npy'))
-        print(' .............. TRAIN LIST CREATION ...............................')     
-        xbitrain3D, ybitrain3D=mds.create_train(rtrainB,4, 0.4, 10,PATH)
-        xbitrain3D, ybitrain3D = dpr.shuffle_and_interpolate(xbitrain3D, ybitrain3D,interpolSize,third_dim = '3D',sess=sess)
-        print(' .............. VALIDATION LIST CREATION .................................')
-        xbival3D, ybival3D = mds.create_train(rvalB,4,0.4,10,PATH)
-        xbival3D, ybival3D = dpr.shuffle_and_interpolate(xbival3D, ybival3D,interpolSize,third_dim = '3D',sess=sess)
-        print(' .............. TEST LIST CREATION .................................')
-        # xbitest, ybitest = uf.create_train(rtest,4,0.4,50,PATH)
-        # xbitest, ybitest = dpr.shuffle_and_interpolate(xbitest, ybitest,interpolSize,third_dim = '3D')
-        
-        encoder = LabelEncoder()
-        ybitrain3D = to_categorical(encoder.fit_transform(ybitrain3D))
-        ybival3D = to_categorical(encoder.fit_transform(ybival3D))
-        # ybitest = to_categorical(encoder.fit_transform(ybitest))
-        print('expand')
-        xbitrain3D = dpr.normalize(np.expand_dims(np.array(xbitrain3D),axis = 4)) 
-        xbival3D = dpr.normalize(np.expand_dims(np.array(xbival3D),axis = 4)) 
-        
-        xbival3D=np.reshape(xbival3D, (np.shape(xbival3D)[0],np.shape(xbival3D)[1],np.shape(xbival3D)[2],np.shape(xbival3D)[3],np.shape(xbival3D)[4]))
-        xbitrain3D=np.reshape(xbitrain3D, (np.shape(xbitrain3D)[0],np.shape(xbitrain3D)[1],np.shape(xbitrain3D)[2],np.shape(xbitrain3D)[3],np.shape(xbitrain3D)[4]))
-        
-        xbitrain2D=[]
-        ybitrain2D=[]
-        for j in range(len(xbitrain3D)):
-            for i in range(len(xbitrain3D[j])):
-                if np.max(xbitrain3D[j,:,:,i]) ==1 and np.argmax(ybitrain3D[j,:])==1 :
-                    xbitrain2D.append(xbitrain3D[j,:,:,i])
-                    ybitrain2D.append(ybitrain3D[j,:])
-        
-                if  np.argmax(ybitrain3D[j,:])==0:
-                    xbitrain2D.append(xbitrain3D[j,:,:,i])
-                    ybitrain2D.append(ybitrain3D[j,:])
-        xbitrain2D, ybitrain2D = shuffle(xbitrain2D,ybitrain2D)
-        
-        xbival2D=[]
-        ybival2D=[]
-        for j in range(len(xbival3D)):
-            for i in range(len(xbival3D[j])):
-                if np.max(xbival3D[j,:,:,i]) ==1 and np.argmax(ybival3D[j,:])==1 :
-                    xbival2D.append(xbival3D[j,:,:,i])
-                    ybival2D.append(ybival3D[j,:])
-        
-                if  np.argmax(ybival3D[j,:])==0:
-                    xbival2D.append(xbival3D[j,:,:,i])
-                    ybival2D.append(ybival3D[j,:])
-        
-        xbival2D, ybival2D = shuffle(xbival2D,ybival2D)
-        return xbitrain2D, ybitrain2D, xbival2D,ybival2D
-    else:
-        # rrB = np.delete(list_pat_ref,f)
-        Xb2D, Yb2D= [[] for i in range(len(list_pat_ref))],[[] for i in range(len(list_pat_ref))]
-        Xb3D, Yb3D = [[] for i in range(len(list_pat_ref))],[[] for i in range(len(list_pat_ref))]
-        print('calculate binary patches')
-        for k in range(len(list_pat_ref)):
-            print(k)
-            rvalB = list_pat_ref[k]
-            if TEST:
-                if k==0:
-                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[3],list_pat_ref[4]]
-                elif k==1:
-                    rtrainB=[list_pat_ref[0],list_pat_ref[2],list_pat_ref[3],list_pat_ref[4]]
-                elif k==2:
-                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[3],list_pat_ref[4]]
-                elif k==3:
-                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[2],list_pat_ref[4]]
-                else:
-                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[0],list_pat_ref[3]]
-                rtrainB=np.concatenate((rtrainB[0],rtrainB[1],rtrainB[2],rtrainB[3]))
-            else:
-                if k==0:
-                    rtrainB=[list_pat_ref[1],list_pat_ref[2],list_pat_ref[3]]
-                elif k==1:
-                    rtrainB=[list_pat_ref[0],list_pat_ref[2],list_pat_ref[3]]
-                elif k==2:
-                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[3]]
-                else:
-                    rtrainB=[list_pat_ref[1],list_pat_ref[0],list_pat_ref[2]]
-                rtrainB=np.concatenate((rtrainB[0],rtrainB[1],rtrainB[2]))
-            
-            
-            print(' .............. TRAIN LIST CREATION ...............................')     
-            xbitrain3D, ybitrain3D=mds.create_train(rtrainB,4, 0.5, 10,PATH)
-            xbitrain3D, ybitrain3D = dpr.shuffle_and_interpolate2(xbitrain3D, ybitrain3D,interpolSize,third_dim = '3D',sess = sess)
-            print(' .............. VALIDATION LIST CREATION .................................')
-            xbival3D, ybival3D = mds.create_train(rvalB,4,0.5,10,PATH)
-            xbival3D, ybival3D = dpr.shuffle_and_interpolate2(xbival3D, ybival3D,interpolSize,third_dim = '3D',sess=sess)
-            encoder = LabelEncoder()
-            ybitrain3D = to_categorical(encoder.fit_transform(ybitrain3D))
-            ybival3D = to_categorical(encoder.fit_transform(ybival3D))
-            print('expand')
-            xbitrain3D = dpr.normalize(np.expand_dims(np.array(xbitrain3D,dtype = np.float32),axis = 4)) 
-            xbival3D = dpr.normalize(np.expand_dims(np.array(xbival3D),axis = 4)) 
-            
-            xbival3D=np.reshape(xbival3D, (np.shape(xbival3D)[0],np.shape(xbival3D)[1],np.shape(xbival3D)[2],np.shape(xbival3D)[3],np.shape(xbival3D)[4]))
-            xbitrain3D=np.reshape(xbitrain3D, (np.shape(xbitrain3D)[0],np.shape(xbitrain3D)[1],np.shape(xbitrain3D)[2],np.shape(xbitrain3D)[3],np.shape(xbitrain3D)[4]))
-            
-            xbitrain2D=[]
-            ybitrain2D=[]
-            for j in range(len(xbitrain3D)):
-                for i in range(len(xbitrain3D[j])):
-                    if np.max(xbitrain3D[j,:,:,i]) ==1 and np.argmax(ybitrain3D[j,:])==1 :
-                        xbitrain2D.append(xbitrain3D[j,:,:,i])
-                        ybitrain2D.append(ybitrain3D[j,:])
-            
-                    if  np.argmax(ybitrain3D[j,:])==0:
-                        xbitrain2D.append(xbitrain3D[j,:,:,i])
-                        ybitrain2D.append(ybitrain3D[j,:])
+class DataBinaryContainer:
+    dict_base_template = {
+        'list_x_3d': [], 
+        'list_x_2d': [], 
+        'list_y_3d': [],
+        'list_y_2d': [], 
+        'list_refs': []
+    }
+
+    def __init__(self):
+        # Initialize dict_base by deep copying the template to avoid shared references
+        self.dict_base = copy.deepcopy(self.dict_base_template)
+
+    def create_binary_dict(self):
+        # Create a binary dictionary with 'train' and 'val' keys
+        return {i: copy.deepcopy(self.dict_base) for i in ('train', 'val')}
+
+    def create_crossval_dict(self, list_pat_ref, cross_validation):
+        # Create a cross-validation dictionary based on list_pat_ref
+        dict_binary = self.create_binary_dict()
+        if cross_validation:
+            return {i: copy.deepcopy(dict_binary) for i in range(len(list_pat_ref))}
+        else:
+            return {0: copy.deepcopy(dict_binary)}
+
+    def set_val_refs(self, dict_binary_crossval, list_pat_ref, cross_validation):
+        # Set the 'list_refs' in the 'val' dictionary for cross-validation
+        if cross_validation:
+            for k in range(len(list_pat_ref)):
+                dict_binary_crossval[k]['val']['list_refs'] = list_pat_ref[k]
+        else:
+            dict_binary_crossval[0]['val']['list_refs'] = np.load(os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Aval.npy'))
+        return dict_binary_crossval
+
+    def set_train_refs(self, dict_binary_crossval, list_pat_ref, cross_validation):
+        # Set the 'list_refs' in the 'val' dictionary for cross-validation
+        if cross_validation:
+            for k in range(len(list_pat_ref)):
+                dict_binary_crossval[k]['train']['list_refs'] = [list_pat_ref[i] for i in range(len(list_pat_ref)) if i != k]
+        else:
+            dict_binary_crossval[0]['train']['list_refs'] = np.load(os.path.join('Results','PATIENTS_SEP_TO_KEEP_154','Balance.npy'))
+        return dict_binary_crossval
     
-            xbitrain2D, ybitrain2D = shuffle(xbitrain2D,ybitrain2D)
-            xbival2D=[]
-            ybival2D=[]
-            for j in range(len(xbival3D)):
-                for i in range(len(xbival3D[j])):
-                    if np.max(xbival3D[j,:,:,i]) ==1 and np.argmax(ybival3D[j,:])==1 :
-                        xbival2D.append(xbival3D[j,:,:,i])
-                        ybival2D.append(ybival3D[j,:])
+    def set_data(self, dict_binary_crossval, path:Path):
+        for fold in dict_binary_crossval.keys():
+            for key in fold.keys():
+                
+                dict_binary_crossval[fold][key]['list_x_3d'], dict_binary_crossval[fold][key]['list_y_3d'] = mds.create_train(dict_binary_crossval[fold][key]['list_refs'],4, 0.4, 10,path)
+
+                encoder = LabelEncoder()
+                
+                dict_binary_crossval[fold][key]['list_y_3d'] = to_categorical(encoder.fit_transform(dict_binary_crossval[fold][key]['list_y_3d']))
+                
+                dict_binary_crossval[fold][key]['list_x_3d'] = dpr.normalize(np.expand_dims(np.array(dict_binary_crossval[fold][key]['list_x_3d']),axis = 4)) 
+                            
+                dict_binary_crossval[fold][key]['list_x_3d']=np.reshape(dict_binary_crossval[fold][key]['list_x_3d'], 
+                                                    (np.shape(dict_binary_crossval[fold][key]['list_x_3d'])[0],
+                                                    np.shape(dict_binary_crossval[fold][key]['list_x_3d'])[1],
+                                                    np.shape(dict_binary_crossval[fold][key]['list_x_3d'])[2],
+                                                    np.shape(dict_binary_crossval[fold][key]['list_x_3d'])[3],
+                                                    np.shape(dict_binary_crossval[fold][key]['list_x_3d'])[4]))
+                        
+                for j in range(len(dict_binary_crossval[fold][key]['list_x_3d'])):
+                    for i in range(len(dict_binary_crossval[fold][key]['list_x_3d'][j])):
+                        
+                        y_max_arg = np.argmax(dict_binary_crossval[fold][key]['list_y_3d'][j, :])
+                        
+                        if (np.max(dict_binary_crossval[fold][key]['list_x_3d'][j, :, :, i]) == 1 and y_max_arg == 1) or y_max_arg == 0:
+                            dict_binary_crossval[fold][key]['list_x_2d'].append(dict_binary_crossval[fold][key]['list_x_3d'][j, :, :, i])
+                            dict_binary_crossval[fold][key]['list_y_2d'].append(dict_binary_crossval[fold][key]['list_y_3d'][j, :])
+                                    
+                dict_binary_crossval[fold][key]['list_x_2d'], dict_binary_crossval[fold][key]['list_y_2d'] = shuffle(dict_binary_crossval[fold][key]['list_x_2d'],dict_binary_crossval[fold][key]['list_y_2d'])
             
-                    if  np.argmax(ybival3D[j,:])==0:
-                        xbival2D.append(xbival3D[j,:,:,i])
-                        ybival2D.append(ybival3D[j,:])
-            
-            xbival2D, ybival2D = shuffle(xbival2D,ybival2D)
-            Xb2D[k], Yb2D[k]=xbival2D,ybival2D
-            Xb3D[k], Yb3D[k]=xbival3D,ybival3D
-            return Xb2D, Yb2D, Xb3D, Yb3D
+            return dict_binary_crossval
+        
+def binary_extraction(list_patients_refs:np.ndarray, cross_validation:bool, paths:Path):
+    
+    # Create an instance of DataBinaryContainer
+    data_binary_container = DataBinaryContainer()
+
+    # Create a cross-validation dictionary
+    dict_binary = data_binary_container.create_crossval_dict(list_patients_refs, cross_validation)
+
+    # Set 'list_refs' in the 'val' dictionaries
+    dict_binary = data_binary_container.set_val_refs(dict_binary, list_patients_refs, cross_validation)
+
+    # Set 'list_refs' in the 'train' dictionaries
+    dict_binary = data_binary_container.set_train_refs(dict_binary, list_patients_refs, cross_validation)
+    
+    # Set x and y in the all dictionaries
+    dict_binary = data_binary_container.set_data(dict_binary, path)
+
+    return dict_binary
+    
+    

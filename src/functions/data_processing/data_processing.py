@@ -5,177 +5,162 @@ MIT License
 Copyright (c) 2021 ludivinemv
 """
 
-
 import os
 import random
-import tensorflow as tf
-import tensorflow.keras.backend as K
-import SimpleITK as sitk
+from pathlib import Path
+
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-import re
-from keras.utils import to_categorical
-from Patient import Patient
-import numpy as np
+from tqdm import tqdm
 from skimage import io
 from skimage.external import tifffile
 from skimage.io import imsave
-from Patient import correction
-from keras.layers import Input, Dense, Conv2D, Flatten,  Dropout,MaxPool3D #,# BatchNormalization#,GlobalAveragePooling2D
-from keras.models import Sequential, Model #, load_model
-#import functions.survival.nnet_survival as ns
+import SimpleITK as sitk
 import nibabel as nib
-import keras
 import scipy
-from keras.applications.vgg16 import VGG16
-from tensorflow.python.ops import gen_nn_ops
+
+import tensorflow as tf
+import tensorflow.keras.backend as K
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.layers import Input, Dense, Conv2D, Flatten, Dropout, MaxPool3D
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.applications import VGG16
+
+from Patient import Patient, correction
+from pretraining import random_patch
 
 
-def createDataAug(numberA=30):
-    ''' 
-    Input
-        numberA : number of augmentation par image
-    Return
-        A matrix containing numberA vectors of augmentation parameters (one vector with par augmentation ). One vector : [translation, zoom scale, rotation, rotation axes, (Horizontal flip, vertical flip)]
-    '''
-    tr, sr, rr, r2r, fr  = [],[],[],[],[]
-    t=[0,0,1,2,3,4,5,6] # translation in the 3 axes
-    s=[0.75,0.8,.9,1,1,1.1,1.2,1.3,1.4] # zoom scale
-    r=[-30,-20,-10,0,0,10,20,30] # rotation
-    r2=[(1,0),(1,0)] #rotation axes
-    f=[(False,False ), (False,False ), (True,False ), (True,True ), (False,True )] # (Horizontal flip, vertical flip)
-    for k in range(numberA):
-        tr.append(t[random.randrange(1,len(t))])
-        sr.append(s[random.randrange(1,len(s))])
-        rr.append(r[random.randrange(1,len(r))])
-        r2r.append( r2[random.randrange(1,len(r2))])
-        fr.append(f[random.randrange(1,len(f))])
-    da = np.array([tr,sr,rr,r2r,fr])
-    return da
+def get_augmentation_config(path:Path, num_augm = 30)-> dict:
+    """Get the augmentation config file if it already exists and num_augm is correct, 
+    otherwise create a new config file.
 
-def DataAugmentation3D(da,x,y,mask,ref,num):
-    ''' 
-    Input
-        da : vector of predifined augmentation parameters
-        x : matrice of individuals' 3D images. Size : (B,36,36,36,1)
-        y : matrice of individuals' target values. Size : (B,2)
-        mask : matrice of individuals' 3D masks. Size : (B,36,36,36,1)
-        ref : vector of individuals' names. Size : (B,1)
-        num : number of augmentation par image
-        B : number of individuals
-    Return
-        Augmented matrice of individuals' images, Augmented matrice of individuals' target values, Augmented matrice of individuals' masks,Augmented matrice of individuals' names
-    '''
-    def translateit(image, offset=[5,5,5], order = 0):
-        return scipy.ndimage.interpolation.shift(image, (int(offset[0]), int(offset[1]),int(offset[2])), order=order, mode='nearest')
-    
-    def scaleit(image, factor=1.2, isseg=False):
-        order = 0 if isseg  else 3
-        height, width, depth= image.shape
-        zheight             = int(np.round(factor * height))
-        zwidth              = int(np.round(factor * width))
-        zdepth              = int(np.round(factor * depth))
-        if factor < 1.0:
-            newimg  = np.zeros_like(image)
-            row     = (height - zheight) // 2
-            col     = (width - zwidth) // 2
-            layer   = (depth - zdepth) // 2
-            newimg[row:row+zheight, col:col+zwidth, layer:layer+zdepth] = scipy.ndimage.interpolation.zoom(image, (float(factor), float(factor), float(factor)), order=order, mode='nearest')[0:zheight, 0:zwidth, 0:zdepth]
-            return newimg
-        elif factor > 1.0:
-            row     = (zheight - height) // 2
-            col     = (zwidth - width) // 2
-            layer   = (zdepth - depth) // 2
-            newimg =scipy.ndimage.interpolation.zoom(image[row:row+zheight, col:col+zwidth, layer:layer+zdepth], (float(factor), float(factor), float(factor)), order=order, mode='nearest')          
-            extrah = (newimg.shape[0] - height) // 2
-            extraw = (newimg.shape[1] - width) // 2
-            extrad = (newimg.shape[2] - depth) // 2
-            newimg = newimg[extrah:extrah+height, extraw:extraw+width, extrad:extrad+depth]
-            return newimg
-        else:
-            return image
+    Args:
+        path (Path): path to data augmentation config file
+        num_augm (int, optional): Number of augmentation par image. Defaults to 30.
 
-    def rotateit(image, theta, isseg=False,axis=(1,0)):
-        order = 0 if isseg  else 5
-        return scipy.ndimage.rotate(image, float(theta), reshape=False,axes=axis ,order=order, mode='nearest')
-    
-    def flipit(image, axes):
-        if axes[0]:
-            image = np.fliplr(image)
-        if axes[1]:
-            image = np.flipud(image)  
-        return image
-
-    def transf(image,tr,sr,rr,r2r,fr):
-        image = translateit(image, offset=[tr,tr,tr], order = 0)
-#        image = scaleit(image, factor=sr, isseg=False)
-        image = rotateit(image, rr, isseg=False,axis=r2r)
-        image=flipit(image,axes = fr)
-        return image
-    
-    xt,yt,mt,rt = [],[],[],[]
-    for b in range(len(x))  :
-        if b%5==0:
-            print(b)
-        for k in range(num):
-            xt.append(transf(x[b,:,:,:,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k]))
-            mt.append(transf(mask[b,:,:,:,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k]))
-            yt.append(y[b])
-            rt.append(ref[b])
-        
-    xt=np.array(xt)    
-    mt=np.array(mt)  
-    rt=np.array(rt)
-    mt=np.where(mt <0.5,0,1)
-    xt=np.reshape(xt,(np.shape(xt)[0],np.shape(xt)[1],np.shape(xt)[2],np.shape(xt)[3],1))
-    mt=np.reshape(mt,(np.shape(mt)[0],np.shape(mt)[1],np.shape(mt)[2],np.shape(mt)[3],1))
-
-    return xt,yt,mt,rt
-
-
-
-def dataAugmentation(da,x,y,m,ref,D3='True',num = 30,fold=5):
-    """ 
-    Input
-        da : vector of predifined augmentation parameters
-        x : matrice of individuals' images. Size : (B,36,36,1)
-        y : matrice of individuals' target values. Size : (B, 2)
-        m : matrice of individuals' masks. Size : (B,36,36,1)
-        ref : vector of individuals' names
-        num : number of augmentation par image
-        B : number of individuals
-    Return
-        xt shape (B*num, 1, 36, 36, 1)
-        yt shape (B*num, 2)
-        maskt shape (B*num, 1, 36, 36, 1)
+    Returns:
+        dict: augmentation config file
     """
-    def translateit(image, offset=[5,5], order = 0):
-        return scipy.ndimage.interpolation.shift(image, (int(offset[0]), int(offset[1])), order=order, mode='nearest')
     
-    def scaleit(image, factor=1.2, isseg=False):
-        order = 0 if isseg  else 3
-        height, width, depth= image.shape
-        zheight             = int(np.round(factor * height))
-        zwidth              = int(np.round(factor * width))
+    if os.path.exists(path):
+        augmentation_config = np.load(path, allow_pickle=True)
+        
+        if np.shape(augmentation_config)[1] != num_augm:
+            augmentation_config = create_augm_config(num_augm = num_augm)
+
+    else:
+        augmentation_config = create_augm_config(num_augm = num_augm)
+    
+    np.save(path, augmentation_config)
+    
+    return augmentation_config
+
+
+def create_augm_config(num_augm = 30)-> dict:
+    """Define a num_augm configuration for data augmentation
+    Choices for configurations are the following
+        - translation: [0,0,1,2,3,4,5,6]
+        - zoom_scale: [0.75,0.8,.9,1,1,1.1,1.2,1.3,1.4],
+        - rotation: [-30,-20,-10,0,0,10,20,30]
+        - rotation_axes: [(1,0)]
+        - Horizontal_flip: [True,False] 
+        - vertical_flip: [True,False]
+    Args:
+        num_augm (int, optional):  Number of augmentation par image. Defaults to 30.
+
+    Returns:
+        dict: dictionary containing num_augm values for each configuration key.
+    
+    Example of output :
+        If num_augm = 3
+        dict_augm_config_selected = {'translation': [2, 6, 3],
+                                    'zoom_scale': [1.1, 0.9, 0.8],
+                                    'rotation': [-10, 0, -10],
+                                    'rotation_axes': [(1, 0), (1, 0), (1, 0)],
+                                    'Horizontal_flip': [False, False, False],
+                                    'vertical_flip': [True, True, False]}
+    """
+    
+    dict_augm_config_choices = {'translation':[0,0,1,2,3,4,5,6], 
+                                'zoom_scale':[0.75,0.8,.9,1,1,1.1,1.2,1.3,1.4], 
+                                'rotation':[-30,-20,-10,0,0,10,20,30],
+                                'rotation_axes':[(1,0)],
+                                'Horizontal_flip':[True,False], 
+                                'vertical_flip':[True,False]}
+    
+    dict_augm_config_selected = {key: [] for key in dict_augm_config_choices.keys()}
+    
+    for key in dict_augm_config_selected.keys():
+        choices = dict_augm_config_choices[key]
+        dict_augm_config_selected[key] = [random.choice(choices) for i in range(num_augm)]
+        
+    return dict_augm_config_selected
+
+
+    
+def apply_data_augmentation(augm_config:dict, images:np.ndarray , y:np.ndarray, masks:np.ndarray, ref:list, D3:str='True', num_augm:int = 30)->dict:
+    """Apply data augmentation
+
+    Args:
+        augm_config (dict): vector of predifined augmentation sparameters
+        images (np.ndarray): matrice of individuals' images. Size : (B,36,36,1)
+        y (np.ndarray): matrice of individuals' target values. Size : (B, 2)
+        masks (np.ndarray): matrice of individuals' masks. Size : (B,36,36,1)
+        ref (list): vector of individuals' names
+        D3 (str, optional): dimension. Defaults to 'True'.
+        num_augm (int, optional): number of augmentation par image. Defaults to 30.
+
+    Returns:
+        dict: dictionary with augmented dataset
+            images_transformed: shape (B*num_augm, 1, 36, 36, 1)
+            y_transformed: shape (B*num_augm, 2)
+            masks_transformed: shape (B*num_augm, 1, 36, 36, 1)
+            ref_transformed: shape (B*num_augm,1)
+    """
+    
+    def translateit(image, offset:tuple, order:int = 0):
+        return scipy.ndimage.interpolation.shift(image, offset, order = order, mode='nearest')
+    
+    def scaleit(image, D3:str, factor=1.2, isseg=False):
+        order                = 0 if isseg  else 3
+        height, width, depth = image.shape
+        zheight              = int(np.round(factor * height))
+        zwidth               = int(np.round(factor * width))
+        if D3 == 'True':
+            zdepth           = int(np.round(factor * depth))
+        
         if factor < 1.0:
             newimg  = np.zeros_like(image)
             row     = (height - zheight) // 2
             col     = (width - zwidth) // 2
-            newimg[row:row+zheight, col:col+zwidth] = scipy.ndimage.interpolation.zoom(image, (float(factor), float(factor)), order=order, mode='nearest')[0:zheight, 0:zwidth]
+            if D3 == 'True':
+                layer   = (depth - zdepth) // 2
+                newimg[row:row+zheight, col:col+zwidth, layer:layer+zdepth] = scipy.ndimage.interpolation.zoom(image, (float(factor), float(factor), float(factor)), order=order, mode='nearest')[0:zheight, 0:zwidth, 0:zdepth]
+            else:
+                newimg[row:row+zheight, col:col+zwidth] = scipy.ndimage.interpolation.zoom(image, (float(factor), float(factor)), order=order, mode='nearest')[0:zheight, 0:zwidth]
             return newimg
+        
         elif factor > 1.0:
             row     = (zheight - height) // 2
             col     = (zwidth - width) // 2
-            newimg =scipy.ndimage.interpolation.zoom(image[row:row+zheight, col:col+zwidth], (float(factor), float(factor)), order=order, mode='nearest')          
+            if D3 == 'True':
+                layer   = (zdepth - depth) // 2
+                newimg =scipy.ndimage.interpolation.zoom(image[row:row+zheight, col:col+zwidth, layer:layer+zdepth], (float(factor), float(factor), float(factor)), order=order, mode='nearest')          
+            else:            
+                newimg =scipy.ndimage.interpolation.zoom(image[row:row+zheight, col:col+zwidth], (float(factor), float(factor)), order=order, mode='nearest')          
             extrah = (newimg.shape[0] - height) // 2
             extraw = (newimg.shape[1] - width) // 2
-            newimg = newimg[extrah:extrah+height, extraw:extraw+width]
+            if D3 == 'True':
+                extrad = (newimg.shape[2] - depth) // 2
+                newimg = newimg[extrah:extrah+height, extraw:extraw+width, extrad:extrad+depth]
+            else:
+                newimg = newimg[extrah:extrah+height, extraw:extraw+width]
             return newimg
         else:
             return image
-
-    def rotateit(image, theta, isseg=False,axis=(1,0)):
+        
+    def rotateit(image, theta:int, isseg:bool = False, axis:tuple = (1,0)):
         order = 0 if isseg  else 5
         return scipy.ndimage.rotate(image, float(theta), reshape=False,axes=axis ,order=order, mode='nearest')
     
@@ -186,301 +171,366 @@ def dataAugmentation(da,x,y,m,ref,D3='True',num = 30,fold=5):
             image = np.flipud(image)  
         return image
 
-    def transf(image,tr,sr,rr,r2r,fr):
-        image = translateit(image, offset=[tr,tr], order = 0)
-#        image = scaleit(image, factor=sr, isseg=False)
-        image = rotateit(image, rr, isseg=False,axis=r2r)
-        image=flipit(image,axes = fr)
+    def get_transformation(image:np.ndarray, augm_config:dict,config_k:int, D3:str)->np.ndarray:
+        """Get transformed image according to augm_config
+
+        Args:
+            image (np.ndarray): image to transform
+            augm_config (dict): chosen augmentation configuration
+            config_k (int): num of the config
+            D3 (str): dimension
+
+        Returns:
+            np.ndarray: transformed image
+        """
+        size_d = 3 if D3 == 'True' else 2
+
+        image = translateit(image, offset=(augm_config['translation'][config_k],)*size_d, order = 0)
+        image = scaleit(image, D3 = D3, factor=augm_config['zoom_scale'][config_k], isseg = False)
+        image = rotateit(image, augm_config['rotation'][config_k], isseg = False, axis = augm_config['rotation_axes'][config_k])
+        image = flipit(image, axes = (augm_config['Horizontal_flip'][config_k],augm_config['vertical_flip'][config_k]))
+        
         return image
     
-    xt=[]
-    yt=[]
-    mt=[]
-    rt=[]
-    for b in range(len(x))  :
-        if b%5==0:
-            print(b)
-        for k in range(num):
-            if D3=='False':
-                xt.append(transf(x[b,:,:,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k]))
-                mt.append(transf(m[b,:,:,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k]))
-                yt.append(y[b])
-                rt.append(ref[b])
-            elif D3=='25':
-                a1 = transf(x[b,:,:,0,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k])
-                a2 = transf(x[b,:,:,1,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k])
-                a3 = transf(x[b,:,:,2,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k])
-                aT = np.array([a1,a2,a3]).transpose(1,2,0)
-                xt.append(aT)
-                m1 = transf(m[b,:,:,0,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k])
-                m2 = transf(m[b,:,:,1,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k])
-                m3 = transf(m[b,:,:,2,0],da[0,k],da[1,k],da[2,k],da[3,k],da[4,k])
-                mT = np.array([m1,m2,m3]).transpose(1,2,0)
-                mt.append(mT)
-                yt.append(y[b])
+    def transform_and_append(data, transformation_dict, key, patient_index, augm_config, config_k, D3):
+        """Apply transformation to the data and append to the specified key in the transformation dictionary.
+        
+        Args:
+            data (numpy.ndarray): The data to be transformed.
+            transformation_dict (dict): The dictionary to store the transformed data.
+            key (str): The key under which to store the transformed data.
+            patient_index (int): The index of the patient data to be transformed.
+            augm_config (dict): The augmentation configuration.
+            config_k (str): The configuration key.
+            D3 (bool): A flag indicating if the transformation is 3D.
+        """
+        transformed_data = get_transformation(data[patient_index, :, :, 0], augm_config, config_k, D3)
+        transformation_dict[key].append(transformed_data)
+    
+    dict_transformation = { 'images_transformed':[],
+                            'y_transformed':[],
+                            'masks_transformed':[],
+                            'ref_transformed':[],
+                            }
+
+    for patient in tqdm(range(len(images)))  :
+        for config_k in range(num_augm):
+            if D3 != '25':
                 
-    xt=np.array(xt)    
-    mt=np.array(mt)  
-    rt=np.array(rt)
-    mt=np.where(mt <0.5,0,1)
-    if D3=='25':        
-        xt=np.reshape(xt,(np.shape(xt)[0],np.shape(xt)[1],np.shape(xt)[2],np.shape(xt)[3],1))
-        mt=np.reshape(mt,(np.shape(mt)[0],np.shape(mt)[1],np.shape(mt)[2],np.shape(xt)[3],1))
-    else:
-        xt=np.reshape(xt,(np.shape(xt)[0],np.shape(xt)[1],np.shape(xt)[2],1))
-        mt=np.reshape(mt,(np.shape(mt)[0],np.shape(mt)[1],np.shape(mt)[2],1))
-    return xt,yt,mt,rt
+                for data, key in zip([images, masks], ['images_transformed', 'masks_transformed']):
+                    transform_and_append(data, dict_transformation, key, patient, augm_config, config_k, D3)
 
+                dict_transformation['y_transformed'].append(y[patient])
+                
+            else:
+                
+                transformed_images = [
+                    get_transformation(images[patient, :, :, i, 0], augm_config, config_k, D3) for i in range(3)
+                ]
+                dict_transformation['images_transformed'].append(np.array(transformed_images).transpose(1, 2, 0))
 
+                transformed_masks = [
+                    get_transformation(masks[patient, :, :, i, 0], augm_config, config_k, D3) for i in range(3)
+                ]
+                dict_transformation['masks_transformed'].append(np.array(transformed_masks).transpose(1, 2, 0))
+                
+            dict_transformation['y_transformed'].append(y[patient])
+            dict_transformation['ref_transformed'].append(ref[patient])
+                
+    for key in dict_transformation.keys():
+        dict_transformation[key] = np.array(dict_transformation[key]) 
+        
+    dict_transformation['masks_transformed'] = 1 - (dict_transformation['masks_transformed'] > 0.5).astype(int)
+       
+    if D3=='True':
+        reshape_to_4d(dict_transformation, ['images_transformed', 'masks_transformed'])
+    else:        
+        reshape_to_5d(dict_transformation, ['images_transformed', 'masks_transformed'])
 
-def create_train(patient_train,k, pourcent_ratio, nb_patch,PATH):    
+    return dict_transformation
+
+def reshape_to_4d(dict_transformation:dict, keys:list):
+    for key in keys:
+        dict_transformation[key] = np.reshape(
+            dict_transformation[key],
+            (dict_transformation[key].shape[0], dict_transformation[key].shape[1], dict_transformation[key].shape[2], 1)
+        )
+
+def reshape_to_5d(dict_transformation:dict, keys:list):
+    for key in keys:
+        dict_transformation[key] = np.reshape(
+            dict_transformation[key],
+            (dict_transformation[key].shape[0], dict_transformation[key].shape[1], dict_transformation[key].shape[2], dict_transformation[key].shape[3], 1)
+        )
+
+def create_train(patient_train:list,k:int, pourcent_ratio:float, nb_patch:int,path:Path):    
     """ 
-    Input
-        patient_train : list of patients
-        k : number of patches per lesion
-        pourcent_ratio : ratio of lesion to be considered as positive
-        nb_patch : number of patches per lesion
-        PATH : path to the individual's folder
-    Return
+    Args:
+        patient_train (list) : list of patients
+        k (int): number of patches per lesion
+        pourcent_ratio (float): ratio of lesion to be considered as positive
+        nb_patch (int) : number of patches per lesion
+        path (Path) : path to the individual's folder
+    Returns:
         liste_patch : list of patches for all individuals
         liste_y : list of associated target values
     """        
-    liste_patch=[]
-    liste_y=[]
+    list_patch=[]
+    list_y=[]
     for patient in patient_train:
-        print(patient, '.......................................................')
-        image3D = io.imread(os.path.join(PATH,patient,'image.tif')).T
-        pd_image = padding(image3D,k)
-        mask=io.imread(os.path.join(PATH,patient,'max.tif')).T
-        pd_mask=padding(mask,k)
-        l_value, l_patch = random_patch(mask,k, pourcent_ratio, nb_patch,image3D,pd_image,pd_mask,os.path.join(PATH,patient))
-        liste_patch.extend(l_patch)
-        liste_y.extend(l_value)
-    return liste_patch, liste_y
+        print(f"Processing patient: {patient} .......................................................")
+        
+        # Load and preprocess the images and masks
+        image3D = io.imread(os.path.join(path, patient,'image.tif')).T
+        pd_image = padding(image3D, k)
+        mask = io.imread(os.path.join(path, patient, 'max.tif')).T
+        pd_mask = padding(mask, k)
+        
+        # Generate patches and target values
+        l_value, l_patch = random_patch(mask, 
+                                        k, 
+                                        pourcent_ratio, 
+                                        nb_patch, image3D, 
+                                        pd_image, 
+                                        pd_mask,
+                                        os.path.join(path,patient))
+        
+        # Append results to the lists
+        list_patch.extend(l_patch)
+        list_y.extend(l_value)
+        
+    return list_patch, list_y
 
-def normalize(x):
-    ''' normalize the images with (x-min)/(max - min) '''
-    return np.array(list(map(lambda a: normi(a),x )))
+def normalize_image(image):
+    """Normalize an image to have pixel values between 0 and 1 using (x - min) / (max - min)."""
+    min_val = np.min(image)
+    max_val = np.max(image)
+    return (image - min_val) / (max_val - min_val)
 
+
+def normalize_batch(images):
+    """Normalize a batch of images."""
+    return np.array([normalize_image(image) for image in images])
     
-def change_name(list_Files):
-    """Change names of files to permit to open the files in the good order. the file name should finish by _XX or _XXX with X a number"""
-    for k in range(len(list_Files)):
-        if list_Files[k][-2]=='_':
-            new=list(list_Files[k][0:-1])
-            new.append('0')
-            new.append('0')
-            new.append(list_Files[k][-1])
-            new_name = "".join(new)
-            os.rename(list_Files[k],new_name)   
-
-        if list_Files[k][-3]=='_':
-            new=list(list_Files[k][0:-2])
-            new.append('0')
-            new.append(list_Files[k][-2])
-            new.append(list_Files[k][-1])
+def change_name(list_files:list):
+    """Rename files to ensure they can be opened in the correct order.
     
-            new_name = "".join(new) 
-            os.rename(list_Files[k],new_name)  
+    The file name should end with _XX or _XXX where X is a number.
 
-def image_mask_ref(PATH):
+    Args:
+        list_files (list): List of file names to be renamed.
     """
-    Extract images and masks for all patients in PATH
-    Input
-        PATH : path to the folder containing all patients
-    Return
-        list of images, list of masks and list of patients
-    """
-    
-    filename = "output.csv"
-    data = pd.read_csv(filename,sep=';',names=['patient','event','time'])
-    patient = list(data.loc[:,'patient'])
-    for i in range(len(data.loc[:,'patient'])):
-        data=data.rename({i : patient[i]})
-    data=data.drop(['patient'],axis = 1)
-    
-    liste_image, liste_mask,liste_ref =[],[],[]
-    print('******************', PATH)
-    for refPatient in os.listdir(PATH):
-        print('ref patient',refPatient)
-        if refPatient in data.index:
-            list_files = [file for file in os.listdir(os.path.join(PATH,refPatient))]
-            if 'dcm'  in list_files and 'max' in list_files:
-                try:
-                    if 'image.tif' not in list_files:
-                        patient = Patient(refPatient, PATH)
-                        correct = patient.correct
-                        image = patient.image
-                        np_image = sitk.GetArrayFromImage(image)
-                        im_Path = os.path.join(PATH,refPatient, "image.tif")
-                        tifffile.imsave(im_Path, np_image.T)
-                    else:
-                        correct = correction(refPatient)
-                        np_image = io.imread(os.path.join(PATH,refPatient,'image.tif')).T                    
-                    if 'max.tif' not in list_files:
-                        pathToAll=makeTifFromPile(os.path.join(PATH,refPatient, "max"),correct)
-                        mask = io.imread(pathToAll).T
-                    else:
-                        m_Path = os.path.join(PATH,refPatient, "max.tif")
-                        mask = io.imread(m_Path).T
-                    liste_ref.append(refPatient)                    
-                    liste_image.append(np_image)                  
-                    liste_mask.append(mask)
-                except:
-                    pass
-    return liste_image,liste_mask,liste_ref
-    
-def padding(image,k): #padding to permit to take in count edges
-    """ Padding the image to take in count edges. 
-    Input
-        x : image which will be applied the padding 
-        k : Size of the padding is 2*k
+    for file_name in list_files:
+        if file_name[-2] == '_':
+            new_name = f"{file_name[:-1]}00{file_name[-1]}"
+            os.rename(file_name, new_name)
 
-    Return
-        image with the padding
+        elif file_name[-3] == '_':
+            new_name = f"{file_name[:-2]}0{file_name[-2:]}"
+            os.rename(file_name, new_name)
+
+def image_mask_ref(path_data: Path) -> dict:
+    """ Extract images and masks for all patients in path_data
+
+    Args:
+        path_data (Path): path to the folder containing all patients
+
+    Returns:
+        dict: dictionary with list of images, list of masks and list of patients
+    """           
+    data = pd.read_csv("output.csv", sep=';', names=['patient','event','time'])
+    data.index = list(data.loc[:,'patient'])
+    data.drop(['patient'], axis = 1, inplace=True)
+    
+    # Initialize dictionary to hold images, masks, and references
+    dict_input = {'list_images': [], 'list_masks': [], 'list_refs': []}
+
+    # Process each patient's data
+    for ref_patient in tqdm(data.index): # each folder contains images for the lesion of the patient
+        list_files = os.listdir(os.listdir(os.path.join(path_data, ref_patient)))
+        
+        if 'dcm'  in list_files and 'max' in list_files:
+            try:
+                if 'image.tif' not in list_files:
+                    patients_list = Patient(ref_patient, path_data)
+                    correct = patients_list.correct
+                    np_image = sitk.GetArrayFromImage(patients_list.image)
+                    tifffile.imsave(os.path.join(path_data,ref_patient, "image.tif"), np_image.T)
+                    
+                else:
+                    correct = correction(ref_patient)
+                    np_image = io.imread(os.path.join(path_data, ref_patient, 'image.tif')).T                    
+                
+                if 'max.tif' not in list_files:
+                    path_all = makeTifFromPile(os.path.join(path_data,ref_patient, "max"),correct)
+                    mask = io.imread(path_all).T
+                
+                else:
+                    mask_path = os.path.join(path_data,ref_patient, "max.tif")
+                    mask = io.imread(mask_path).T
+                    
+                dict_input['list_refs'].append(ref_patient)                    
+                dict_input['list_images'].append(np_image)                  
+                dict_input['list_masks'].append(mask)
+                
+            except Exception as e:
+                print(f"Error processing {ref_patient}: {e}")
+                continue
+            
+    return dict_input
+    
+def padding(image: np.ndarray, k: int) -> np.ndarray:
+    """Apply padding to the image to handle edges.
+
+    Args:
+        image (np.ndarray): The image to be padded.
+        k (int): Size of the padding is 2*k.
+
+    Returns:
+        np.ndarray: The padded image.
     """
-    pad_image=np.pad(image,((0,2*k),(0,2*k),(0,2*k)),mode = 'symmetric')
-    return pad_image
+
+    padded_image = np.pad(image, ((0, 2*k), (0, 2*k), (0, 2*k)), mode='symmetric')
+    return padded_image
 
 def read_output():
-    """ Read output.csv and give a dataframe with event and time."""
-    filename = "output.csv"
-    data = pd.read_csv(filename,sep=';',names=['patient','event','time'])
-    patient = list(data.loc[:,'patient'])
-    for i in range(len(data.loc[:,'patient'])):
-        data=data.rename({i : patient[i]})
-    data=data.drop(['patient'],axis = 1)
+    """Read 'output.csv' and return a dataframe with event and time.
+
+    Returns:
+        pd.DataFrame: DataFrame containing event and time data.
+        list: List of patient identifiers.
+    """
+    data = pd.read_csv("output.csv", sep=';', names=['patient', 'event', 'time'])
+    patient = data['patient'].tolist()
+    data.index = patient
+    data.drop(columns=['patient'], inplace=True)
     return data, patient
 
+def interpolation3D(liste_patch:list, interpolation_size:int, third_dim:int=3, sess=None):
+    """Resize images in liste_patch to interpolation_size and interpolate them.
 
+    Args:
+        liste_patch (list): List of image patches to be interpolated.
+        interpolation_size (int): Size to interpolate the images to.
+        third_dim (str or int): Dimension to handle the interpolation ('3D' for 3D unpooling).
+        sess (tf.Session, optional): TensorFlow session for 3D unpooling. Defaults to None.
 
-def interpolation3D(liste_patch,interpolSize,third_dim=3,sess=None):
-    """  Resize images in liste_patch with the size interpolSize and interpolate"""
-    if interpolSize != None:
-        liste_interpolate = []
-        print('interpolation')
-        if third_dim!= '3D':
-            for i in range(len(liste_patch)): 
-                im=sitk.GetImageFromArray(np.array(liste_patch[i]))
-                resampleImageFilter = sitk.ExpandImageFilter()
-                resampleImageFilter.SetExpandFactor(4/np.array(liste_patch[i])[1])
-                resampleImageFilter.SetInterpolator(sitk.sitkBSplineResamplerOrder2)
-                resultedImage = resampleImageFilter.Execute(im)
-                im2= sitk.GetArrayFromImage(resultedImage)
-            if third_dim == 3:
-                im2 = np.array(im2)[:,:,interpolSize//2-1:interpolSize//2+2]
-            liste_interpolate.append(im2)
-        else:
-            def unpool_3D(input_layer,x,y,z):
-                unpol_layer = tf.keras.layers.UpSampling3D(size=(x,y,z))(input_layer)
-                return unpol_layer
-            y=interpolSize/np.shape(liste_patch[0])[0]
-
-            liste_interpolate= unpool_3D(liste_patch,int(y),int(y),int(y)).eval(session=sess)
-        return liste_interpolate
-    else :
+    Returns:
+        list: List of interpolated image patches.
+    """
+    if interpolation_size is None:
         return liste_patch
-    
-def shuffle_and_interpolate(liste_patch, liste_y,liste_ref,interpolSize,interStatue=True,liste_mask=[],third_dim=3,sess = None):
-    """ Interpolate a list of images and shuffle with the true values vector (y) associated. 
-    
-    If interStatue = True, interpolation"""
-    liste_patch=np.array(liste_patch)
-    liste_ref=np.array(liste_ref)
-    if len(np.shape(liste_mask)) != 1:
-        liste_mask=np.array(liste_mask)
-    liste_y=np.array(liste_y)
-    
-    if interStatue :
-        liste_patch = interpolation3D(liste_patch,interpolSize,third_dim,sess=sess)
 
-    x = np.arange(0,len(liste_y))
-    random.shuffle(x)
+    liste_interpolate = []
+    print('Interpolation started')
+
+    if third_dim != '3D':
+        for patch in liste_patch:
+            image = sitk.GetImageFromArray(np.array(patch))
+            
+            resampleImageFilter = sitk.ExpandImageFilter()
+            resampleImageFilter.SetExpandFactor(4 / np.array(patch)[1])
+            resampleImageFilter.SetInterpolator(sitk.sitkBSplineResamplerOrder2)
+            resultedImage = resampleImageFilter.Execute(image)
+            
+            arr_image = sitk.GetArrayFromImage(resultedImage)
+            
+            if third_dim == 3:
+                arr_image = np.array(arr_image)[:, :, interpolation_size // 2 - 1:interpolation_size // 2 + 2]
+            
+            liste_interpolate.append(arr_image)
+    else:
+        def unpool_3D(input_layer, x, y, z):
+            return tf.keras.layers.UpSampling3D(size=(x, y, z))(input_layer)
+        
+        y = interpolation_size / np.shape(liste_patch[0])[0]
+        
+        liste_interpolate = unpool_3D(liste_patch, int(y), int(y), int(y)).eval(session=sess)
+
+    return liste_interpolate
+
+def shuffle_and_interpolate(list_patch:list, 
+                            list_y:list, 
+                            list_refs: list = None,
+                            interpolation_size:int = 36, 
+                            apply_interpolation:bool=True, 
+                            list_masks:list = [],
+                            third_dim:int = 3,
+                            sess = None):
+    """
+    Interpolate a list of images and shuffle them along with their associated true values and references.
+
+    Args:
+        list_patch (list): List of image patches.
+        list_y (list): List of true values associated with the patches.
+        list_refs (list, optional): List of reference values.
+        interpolation_size (int, optional): The size to interpolate the image patches to Default to 36.
+        apply_interpolation (bool, optional): Flag to apply interpolation. Defaults to True.
+        list_masks (list, optional): List of masks. Defaults to an empty list.
+        third_dim (int, optional): Third dimension for the interpolation. Defaults to 3.
+        sess (optional): TensorFlow session for interpolation. Defaults to None.
+
+    Returns:
+        tuple: Shuffled and interpolated patches, true values, references  and masks as applicable.
+    """
+
+    list_patch = np.array(list_patch)
+    list_refs = np.array(list_refs)
+    list_y = np.array(list_y)
+
+    if list_masks is not None and len(np.shape(list_masks)) != 1:
+        list_masks = np.array(list_masks)
+        
+    if apply_interpolation:
+        list_patch = interpolation3D(list_patch, interpolation_size, third_dim, sess=sess)
+
+    indices = np.arange(len(list_y))
+    np.random.shuffle(indices)
+
+    shuffled_ref = list_refs[indices]
+    shuffled_y = list_y[indices]
+    shuffled_patches = list_patch[indices]
+
+    if list_masks is not None and len(list_masks.shape) != 1:
+        shuffled_masks = list_masks[indices]
+        return shuffled_patches, shuffled_y, shuffled_masks, shuffled_ref
+
+    return shuffled_patches, shuffled_y, shuffled_ref
     
-    sr = np.array(liste_ref)[x]
-    sy = np.array(liste_y)[x]
-    if len(np.array(liste_patch).shape) == 4:
-        sp = np.array(liste_patch)[x,:,:,:]
-        if len(np.shape(liste_mask)) != 1:  
-            sp2 = np.array(liste_mask)[x,:,:,:]
-    else: 
-        sp = np.array(liste_patch)[x,:,:]
-        if len(np.shape(liste_mask)) != 1:  
-            sp2 = np.array(liste_mask)[x,:,:]
-    if len(np.shape(liste_mask)) != 1:  
-        return sp,sy, sp2,sr
-    else:  
-        return sp,sy,sr
 
-
-def shuffle_and_interpolate2(liste_patch, liste_y,interpolSize,interStatue=True,liste_mask=[],third_dim=3,sess = None):
-    """ Interpolate a list of images and shuffle with the y associated. 
-    If interStatue = True, interpolation.
-    The same than shuffle_and_interpolate() but without liste_ref as input"""
-    liste_patch=np.array(liste_patch)
-    if len(np.shape(liste_mask)) != 1:
-        liste_mask=np.array(liste_mask)
-    liste_y=np.array(liste_y)
+def ground_truth_processing(data, list_patients:list = None, classes = None):
+    # Filter the dataframe to include only the patients in list_patients
+    y = data[data.index.isin(list_patients)].copy()
     
-    if interStatue :
-        liste_patch = interpolation3D(liste_patch,interpolSize,third_dim,sess=sess)
-
-    x = np.arange(0,len(liste_y))
-    random.shuffle(x)
-    
-    sy = np.array(liste_y)[x]
-    if len(np.array(liste_patch).shape) == 4:
-        sp = np.array(liste_patch)[x,:,:,:]
-        if len(np.shape(liste_mask)) != 1:  
-            sp2 = np.array(liste_mask)[x,:,:,:]
-    else: 
-        sp = np.array(liste_patch)[x,:,:]
-        if len(np.shape(liste_mask)) != 1:  
-            sp2 = np.array(liste_mask)[x,:,:]
-    if len(np.shape(liste_mask)) != 1:  
-        return sp,sy, sp2
-    else:  
-        return sp,sy
-
-
-
-def ground_truth_processing(data,liste_patients,classes):    
-    y = data.copy()
-    
-    for pat in data.index:
-        if pat not in liste_patients :
-            y=y.drop(pat)
-    
-    y_grp = y.copy()
-    y_grp = y_grp.drop('time',axis=1)
-    y_grp=y_grp.rename(columns={'event': 'group'})
+    # Create a copy of the filtered dataframe and prepare the group column
+    y_grp = y.drop(columns='time').rename(columns={'event': 'group'})
     
     for pat in y_grp.index:
-        if classes == 'TWO' or classes == 'TWOWC' :
-            if y.loc[pat,'time']<= 1095 :
-                if y.loc[pat,'event'] == 1:
-                    y_grp.loc[pat,'group'] = 0
-                else :
-                    y_grp.loc[pat,'group'] = 2  
-            else :
-                 y_grp.loc[pat,'group'] = 1
-        elif classes == 'THREE':
-            if y.loc[pat,'time']<= 803 :
-                y_grp.loc[pat,'group'] = 0
-            elif y.loc[pat,'time'] > 1606  :
-                y_grp.loc[pat,'group'] = 2 
-            else :
-                 y_grp.loc[pat,'group'] = 1            
-        elif classes == 'YEAR' or classes == 'YEARWC' : # group 1 : less than 1 year, 5 : between 4 and 5 years, 10 : censorship
-            if y.loc[pat,'event'] == 1  and y.loc[pat,'time']//365 <= 5:
-                y_grp.loc[pat,'group'] = y.loc[pat,'time']//365
-            elif y.loc[pat,'time']//365 >= 5:
-                y_grp.loc[pat,'group'] = 5
-            else:
-                y_grp.loc[pat,'group'] = 6
-        else:
-            y_grp = data
+        match classes:
+            case ['TWO', 'TWOWC']:
+                if y.loc[pat, 'time'] <= 1095:
+                    y_grp.loc[pat, 'group'] = 0 if y.loc[pat, 'event'] == 1 else 2
+                else:
+                    y_grp.loc[pat, 'group'] = 1
+            case 'THREE':
+                if y.loc[pat, 'time'] <= 803:
+                    y_grp.loc[pat, 'group'] = 0
+                elif y.loc[pat, 'time'] > 1606:
+                    y_grp.loc[pat, 'group'] = 2
+                else:
+                    y_grp.loc[pat, 'group'] = 1
+            case 'YEAR' | 'YEARWC':  # group 1: less than 1 year, 5: between 4 and 5 years, 10: censorship
+                if y.loc[pat, 'event'] == 1 and y.loc[pat, 'time'] // 365 <= 5:
+                    y_grp.loc[pat, 'group'] = y.loc[pat, 'time'] // 365
+                elif y.loc[pat, 'time'] // 365 >= 5:
+                    y_grp.loc[pat, 'group'] = 5
+                else:
+                    y_grp.loc[pat, 'group'] = 6
+            case _:
+                y_grp = data
+        
     y_grp.to_csv('y_grp.csv')
+    
     return y_grp
 
 
@@ -601,674 +651,484 @@ def ground_truth_processing2(y,classe):
     y_grp = to_categorical(y_grp.values)
     return y_grp
 
-def separation(doss,List_of_Patient,rates=[0.5,0.25,0.25],outnames = "./output.csv",sep=';',cl='all'): 
-    """ Input: List with the patient names. rates = liste of rates.
+def separation(folder, list_patients, rates=[0.5,0.25,0.25], outnames = "./output.csv", sep=';', classes_method='all'): 
+    """
+    Separate patients into groups with balanced classes and save the results as .npy files.
     
-    Output: a list of patient list with the same number of elements than the size of the rate."""
-    #random.shuffle(List_of_Patient)
-    liste=[]
-    name1 = doss+"r0.npy"
-    name2 = doss+"r1.npy"
-    name3 = doss+"r2.npy"
-    name4 = doss+"r3.npy"
-    if len(rates)==5:
-        name5=doss+ "r4.npy"
+    Args:
+    - folder (str): Folder path where the output files will be saved.
+    - list_patients (list): List of patient names/IDs.
+    - rates (list): List of rates for splitting the patients. Default is [0.5, 0.25, 0.25].
+    - outnames (str): Output filename for classified patients data. Default is "./output.csv".
+    - sep (str): Separator for the CSV file. Default is ';'.
+    - classes_method (str): Class category for filtering patients. Default is 'all'.
+    
+    Returns:
+    - list_references (list): List of lists with patient IDs separated into folds.
+    """
+    
+    def fill_classes(to_remove:int=None):
+        return [str(i) for i in range(7) if i is not to_remove] + [f"{i}Censorship" for i in range(7) if i is not to_remove]
 
-    if os.path.exists(name1) and os.path.exists(name2) and os.path.exists(name3) and os.path.exists(name4) :        
-        r1= np.load(name1)
-        r2 = np.load(name2)
-        r3 = np.load(name3)
-        r4 = np.load(name4)
-        if len(rates)==5 and os.path.exists(name5):
-            r5= np.load(name5)
-            rcc=[r1,r2,r3,r4,r5]
-        elif len(rates)==4:
-            rcc=[r1,r2,r3,r4]
-        else:
-            listeClasses=[]
-            y_grp = classifyPatients(List_of_Patient,outnames=outnames)
-            if cl == 'all':
-                nameC = ["0","1","2","3","4","5","6","0Censorship","1Censorship","2Censorship","3Censorship","4Censorship","5Censorship","6Censorship"]
-            elif cl == 'sans0':
-                nameC = ["1","2","3","4","5","6","1Censorship","2Censorship","3Censorship","4Censorship","5Censorship","6Censorship"]
-            elif cl == 'sans1':
-                nameC = ["0","2","3","4","5","6","0Censorship","2Censorship","3Censorship","4Censorship","5Censorship","6Censorship"]
-            elif cl == 'sans2':
-                nameC = ["0","1","3","4","5","6","0Censorship","1Censorship","3Censorship","4Censorship","5Censorship","6Censorship"]
-            elif cl == 'sans3':
-                nameC = ["0","1","2","4","5","6","0Censorship","1Censorship","2Censorship","4Censorship","5Censorship","6Censorship"]
-            elif cl == 'sans4':
-                nameC = ["0","1","2","3","5","6","0Censorship","1Censorship","2Censorship","3Censorship","5Censorship","6Censorship"]
-            elif cl == 'sans5':
-                nameC = ["0","1","2","3","4","6","0Censorship","1Censorship","2Censorship","3Censorship","4Censorship","6Censorship"]
-            elif cl == 'sans6':
-                nameC = ["0","1","2","3","4","5","0Censorship","1Censorship","2Censorship","3Censorship","4Censorship","5Censorship"]
-                        
-            elif cl == 'classe0':
-                nameC = ["0","0Censorship"]
-            elif cl == 'classe1':
-                nameC = ["1","1Censorship"]            
-            elif cl == 'classe2':
-                nameC = ["2","2Censorship"]            
-            elif cl == 'classe3':
-                nameC = ["3","3Censorship"]           
-            elif cl == 'classe4':
-                nameC = ["4","4Censorship"]           
-            elif cl == 'classe5':
-                nameC = ["5","5Censorship"]            
-            elif cl == 'classe6':
-                nameC = ["6","6Censorship"]
-            for classes in nameC:
-                listeClasses.append(y_grp.loc[y_grp['group'] == classes].index)
-            rcc=[[] for i in range(len(rates))]
-            r=0
-            for cc in range(len(listeClasses)):
-                pa = 0
-                while pa <len(listeClasses[cc]) and len(listeClasses[cc])!=0:
-                    rcc[r].append(listeClasses[cc][pa])
-                    pa+=1
-                    r+=1
-                    if r >=len(rates):
-                        r=0
-    
-            rcc=[random.sample(rcc[i],len(rcc[i])) for i in range(len(rcc))]
-            for i in range(len(rcc)):
-                np.save(doss+"r"+ str(i)+".csv",np.array(rcc[i]))
+
+    #random.shuffle(list_patients)
+    list_names = [os.path.join(folder, f"r{i}.npy") for i in range(len(rates))]
+        
+    if all(os.path.exists(name) for name in list_names) :   
+        # Load existing files
+        list_references = [np.load(name) for name in list_names]
+
     else:  
-        listeClasses=[]
-        y_grp = classifyPatients(List_of_Patient,outnames= outnames,sep=sep)
-        if cl == 'all':
-            nameC = ["0","1","2","3","4","5","6","0Censorship","1Censorship","2Censorship","3Censorship","4Censorship","5Censorship","6Censorship"]
-        elif cl == 'sans0':
-            nameC = ["1","2","3","4","5","6","1Censorship","2Censorship","3Censorship","4Censorship","5Censorship","6Censorship"]
-        elif cl == 'sans1':
-            nameC = ["0","2","3","4","5","6","0Censorship","2Censorship","3Censorship","4Censorship","5Censorship","6Censorship"]
-        elif cl == 'sans2':
-            nameC = ["0","1","3","4","5","6","0Censorship","1Censorship","3Censorship","4Censorship","5Censorship","6Censorship"]
-        elif cl == 'sans3':
-            nameC = ["0","1","2","4","5","6","0Censorship","1Censorship","2Censorship","4Censorship","5Censorship","6Censorship"]
-        elif cl == 'sans4':
-            nameC = ["0","1","2","3","5","6","0Censorship","1Censorship","2Censorship","3Censorship","5Censorship","6Censorship"]
-        elif cl == 'sans5':
-            nameC = ["0","1","2","3","4","6","0Censorship","1Censorship","2Censorship","3Censorship","4Censorship","6Censorship"]
-        elif cl == 'sans6':
-            nameC = ["0","1","2","3","4","5","0Censorship","1Censorship","2Censorship","3Censorship","4Censorship","5Censorship"]
-        elif cl == 'classe0':
-            nameC = ["0","0Censorship"]
-        elif cl == 'classe1':
-            nameC = ["1","1Censorship"]            
-        elif cl == 'classe2':
-            nameC = ["2","2Censorship"]            
-        elif cl == 'classe3':
-            nameC = ["3","3Censorship"]           
-        elif cl == 'classe4':
-            nameC = ["4","4Censorship"]           
-        elif cl == 'classe5':
-            nameC = ["5","5Censorship"]            
-        elif cl == 'classe6':
-            nameC = ["6","6Censorship"]
-        for classes in nameC:
-            listeClasses.append(y_grp.loc[y_grp['group'] == classes].index)
-        rcc=[[] for i in range(len(rates))]
-        r=0
-        for cc in range(len(listeClasses)):
-            pa = 0
-            while pa <len(listeClasses[cc]) and len(listeClasses[cc])!=0:
-                rcc[r].append(listeClasses[cc][pa])
-                pa+=1
-                r+=1
-                if r >=len(rates):
-                    r=0
+        class_map = {'all':fill_classes()}
+        for c in range(7):
+            class_map[f"without_{c}"] = fill_classes(c)
+            class_map[f"class_{c}"] = [str(c), f"{c}_censorship"]
+        
+        name_classes = class_map[classes_method]
 
-        rcc=[random.sample(rcc[i],len(rcc[i])) for i in range(len(rcc))]
-        for i in range(len(rcc)):
-            np.save(doss+"r"+ str(i),np.array(rcc[i]))
-            
-    return rcc
+        y_grp = classify_patients(list_patients, outnames= outnames, sep=sep)
+
+        list_classes=[y_grp.loc[y_grp['group'] == classes].index for classes in name_classes]
+
+        list_references=[[] for _ in range(len(rates))]
+        fold_index = 0
+
+        # distribute patients from each classes in each fold 
+        for classes in range(len(list_classes)):
+            patient_index = 0
+            # Continue while there are patients in the current class
+            while patient_index < len(list_classes[classes]):
+                # Add the patient to the current fold
+                list_references[fold_index].append(list_classes[classes][patient_index])
+                patient_index+=1
+                fold_index+=1
+                # Reset fold_index if it exceeds the number of folds
+                if fold_index >=len(rates):
+                    fold_index=0
+
+        list_references=[random.sample(list_references[i],len(list_references[i])) for i in range(len(list_references))]
+   
+        # Save the groups to .npy files
+        for i, group in enumerate(list_references):
+            np.save(os.path.join(folder, f"r{i}.npy"), np.array(group))
+
+    return list_references
 
 
 
-def classifyPatients(List_of_Patient,outnames = "output.csv",sep=';') :
-    filename = outnames
-    data = pd.read_csv(filename,sep=sep,names=['patient','event','time'])
-    patient = list(data.loc[:,'patient'])
-    for i in range(len(data.loc[:,'patient'])):
-        data=data.rename({i : patient[i]})
-    data=data.drop(['patient'],axis = 1)
-    y = data.copy()
-    for pat in data.index:
-        if pat not in List_of_Patient :
-            y=y.drop(pat)
+def classify_patients(list_patients, outnames = "output.csv", sep=';') :
+   # Load the data from the CSV file
+    data = pd.read_csv(outnames, sep=sep, names=['patient', 'event', 'time'])
     
-    y_grp = y.copy()
-    y_grp = y_grp.drop('time',axis=1)
-    y_grp=y_grp.rename(columns={'event': 'group'})
+    # Rename the index with patient names
+    patient_names = data['patient'].tolist()
+    data.index = patient_names
+    data.drop(columns=['patient'], inplace=True)
     
+    # Filter the data to include only the patients in list_patients
+    y = data.loc[data.index.isin(list_patients)].copy()
     
+    # Create a new dataframe for the groups
+    y_grp = y.drop(columns='time').rename(columns={'event': 'group'})
+    
+    # Classify patients into groups
     for pat in y_grp.index:
-        if y.loc[pat,'event'] =='1' or y.loc[pat,'event'] == 1:
-            y_grp.loc[pat,'group'] = str(int(y.loc[pat,'time'])//365)
-        else:
-            y_grp.loc[pat,'group'] = str(int(y.loc[pat,'time'])//365)+'Censorship'
+        event = y.loc[pat, 'event']
+        time = int(y.loc[pat, 'time']) // 365
+        y_grp.loc[pat, 'group'] = str(time) if event == '1' or event == 1 else f"{time}Censorship"
+    
     return y_grp
 
 
-
-
-def BalancedSeparation(List_of_Patient,file,rates=[0.5,0.25,0.25],classe = 'YEAR', change = True,outnames = "./output.csv"): 
-    random.shuffle(List_of_Patient)
+def balanced_separation(list_patients, file_images, rates=[0.5,0.25,0.25], classe = 'YEAR', rerun_separation = True, outnames = "./output.csv"): 
+    # Shuffle the list of patients
+    random.shuffle(list_patients)
     
-    #open the file with survival quantities
-    filename = outnames
-    data = pd.read_csv(filename,sep=';',names=['patient','event','time'])
-    patient = list(data.loc[:,'patient'])
-    for i in range(len(data.loc[:,'patient'])):
-        data=data.rename({i : patient[i]})
-    data=data.drop(['patient'],axis = 1)
-
-    if classe=='surv':
-        noC= 7
-        y = data.copy()
-        for pat in data.index:
-            if pat not in List_of_Patient :
-                y=y.drop(pat)
-        y_grp = y.copy()
-        y_grp = y_grp.drop('time',axis=1)
-        y_grp=y_grp.rename(columns={'event': 'group'})
+    # Load survival data
+    data = pd.read_csv(outnames, sep=';', names=['patient', 'event', 'time'])
+    data.index = data['patient']
+    data.drop(columns=['patient'], inplace=True)
+    
+    # correspondance between classe and number of group
+    number_of_classes = {'YEAR': 7, 'YEARWC': 6, 'TWO': 3, 'surv': 7}.get(classe, 2)
+    
+    # Process survival data for classification
+    if classe == 'surv':
+        y = data.loc[data.index.isin(list_patients)].copy()
+        y_grp = y.drop(columns='time').rename(columns={'event': 'group'})
+        y_grp['group'] = y['time'] // 365
         
-        for pat in y_grp.index:
-            y_grp.loc[pat,'group'] = y.loc[pat,'time']//365
-            
     else:
-        # correspondance between classe and number of group
-        if classe == 'YEAR':   
-            noC = 7
-        elif classe == 'YEARWC':
-            noC = 6
-        elif classe == 'TWO':
-            noC = 3
-        else:
-            noC = 2
-        y_grp = ground_truth_processing(data,List_of_Patient,classe)
+        y_grp = ground_truth_processing(data, list_patients, classe)
     
-    C= []
-    for i in range(noC):
-        C.append([])
-    for i,n in enumerate(List_of_Patient):
-        C[y_grp.loc[n][0]].append(n)
-    name1 = file+"Balance.npy"
-    name2 = file+"Ate.npy"
-    name3 = file+"Aval.npy"
+    # Create lists to store patients for each class
+    C = [[] for _ in range(noC)]
+    for patient in list_patients:
+        C[int(y_grp.loc[patient, 'group'])].append(patient)
+    
+    # Define filenames for saving/loading splits
+    filenames = [os.path.join(file_images, f"{name}.npy") for name in ["Balance", "Ate", "Aval"]]
 
-    if os.path.exists(name1) and os.path.exists(name2) and os.path.exists(name3) and change!= True:        
-        Atr= np.load(name1)
-        Ate = np.load(name2)
-        Aval = np.load(name3)
+    # Load existing splits if available and rerun_separation is False
+    if all(os.path.exists(name) for name in filenames) and not rerun_separation:
+        fold_train, fold_test, fold_validation = (np.load(name) for name in filenames)
     else:
-        Atr =[]
-        Ate = []
-        Aval = []
-        for j in range(len(C)):
-            if len(C[j]) >=2:
-                A = int(0.5*len(C[j]))
-            else:
-                A= len(C[j])
-            B = int((len(C[j]) - A )/2)
-            for k in range(A):
-                Atr.append(C[j][k])
-            for k in range(B):
-                b = k + A
-                Ate.append(C[j][b])
-            for k in range(B):
-                b = k + A + B
-                Aval.append(C[j][b])                
-        Atr = np.random.permutation(Atr)
-        Ate = np.random.permutation(Ate)
-        Aval = np.random.permutation(Aval)
-        np.save(name3,Aval)
-        np.save(name2,Ate)
-        np.save(name1,Atr)
-    return [Atr,Ate,Aval]
+        # Create new splits
+        fold_train, fold_test, fold_validation = [], [], []
+        for group in C:
+            n = len(group)
+            split1 = int(0.5 * n)
+            split2 = (n - split1) // 2
+            fold_train.extend(group[:split1])
+            fold_test.extend(group[split1:split1 + split2])
+            fold_validation.extend(group[split1 + split2:])
+        
+        # Shuffle the splits
+        fold_train = np.random.permutation(fold_train)
+        fold_test = np.random.permutation(fold_test)
+        fold_validation = np.random.permutation(fold_validation)
+
+        # Save the splits
+        for name, data in zip(filenames, [fold_train, fold_test, fold_validation]):
+            np.save(name, data)
+    
+    return [fold_train, fold_test, fold_validation]
 
 
-
-def saving(fitting,title,eval_train, eval_val,resu,file,metrics):
-    if fitting != None:
+def save_training_plots(fitting, title, eval_train, eval_val, resu, file_images, metrics):
+    if fitting is not None:
         # Plot training And validation accuracy values
         plt.figure(figsize=(15,5), dpi=70)
-        if metrics == 'accuracy':
-            plt.subplot(1, 2 ,2)
-            plt.plot(fitting.history['acc'], label="train")
-            plt.plot(fitting.history['val_acc'], label="valid")
-            titleA = title + '_accuracy'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('Accuracy')
+        
+        title_map = {
+            'accuracy': '_accuracy',
+            'rankAndMSE': ['_mse loss', '_rank loss', '_cindex'],
+            'coxAndrank': ['_rank loss', '_cox loss', '_cindex'],
+            'coxAndclassif': ['_tf_cindex', '_accuracy', '_classif_loss', '_cox_loss'],
+            'coxAndmse': ['_mse loss', '_cox loss', '_cindex'],
+            'tf_cindex': '_cindex',
+            'tf_cindexTD': '_cindex',
+            'triplet': ['_cindex', '_accuracy'],
+            'RankAnddiscret': ['_rank loss', '_cindex', '_surv_likelihood']
+        }
+        metric_map = {
+            'accuracy': ['acc', 'val_acc'],
+            'rankAndMSE': ['mse', 'val_mse', 'rank', 'val_rank', 'tf_cindexT', 'val_tf_cindexT'],
+            'coxAndrank': ['rank', 'val_rank', 'cox', 'val_cox', 'tf_cindexR', 'val_tf_cindexR'],
+            'coxAndclassif': ['Partial_likelihood_tf_cindexR', 'val_Partial_likelihood_tf_cindexR',
+                              'Cross_entropy_loss_acc', 'val_Cross_entropy_loss_acc',
+                              'Cross_entropy_loss_loss', 'val_Cross_entropy_loss_loss',
+                              'Partial_likelihood_loss', 'val_Partial_likelihood_loss'],
+            'coxAndmse': ['mse', 'val_mse', 'cox', 'val_cox', 'tf_cindexR', 'val_tf_cindexR'],
+            'tf_cindex': ['tf_cindexR', 'val_tf_cindexR'],
+            'tf_cindexTD': ['tf_cindexTD', 'val_tf_cindexTD'],
+            'triplet': ['tf_cindexT', 'val_tf_cindexT', 'acc', 'val_acc'],
+            'RankAnddiscret': ['rankL', 'val_rankL', 'tf_cindexTD', 'val_tf_cindexTD', 'discretcox', 'val_discretcox']
+        }
+        
+        plots = metric_map.get(metrics, [])
+        titles = title_map.get(metrics, '')
+        for idx, plot in enumerate(plots, start=2):
+            plt.subplot(2, 2, idx)
+            plt.plot(fitting.history[plot], label="train")
+            plt.plot(fitting.history[f'val_{plot}'], label="valid")
+            plt.title(title + titles[idx - 2])
+            plt.legend(loc='upper left')
+            plt.ylabel(plot.replace('_', ' ').title())
             plt.xlabel('Epoch')
-            
-        if metrics=='rankAndMSE':
-            plt.subplot(2,2 ,3)
-            plt.plot(fitting.history['mse'], label="train mse")
-            plt.plot(fitting.history['val_mse'], label="valid mse")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_mse loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('mse loss')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(2,2 ,4)
-            plt.plot(fitting.history['rank'], label="train rank")
-            plt.plot(fitting.history['val_rank'], label="valid rank")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_rank loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('rank loss')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(2, 2 ,2)
-            plt.plot(fitting.history['tf_cindexT'], label="train")
-            plt.plot(fitting.history['val_tf_cindexT'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cindex'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('C index')
-            plt.xlabel('Epoch')
-            
-        elif metrics =='coxAndrank':
-            plt.subplot(2,2 ,3)
-            plt.plot(fitting.history['rank'], label="train rank")
-            plt.plot(fitting.history['val_rank'], label="valid rank")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_rank loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('rank loss')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(2,2 ,4)
-            plt.plot(fitting.history['cox'], label="train cox")
-            plt.plot(fitting.history['val_rank'], label="valid cox")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cox loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('cox loss')
-            plt.xlabel('Epoch')
-            plt.subplot(2, 2 ,2)
-            plt.plot(fitting.history['tf_cindexR'], label="train")
-            plt.plot(fitting.history['val_tf_cindexR'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cindex'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('C index')
-            plt.xlabel('Epoch')
-        elif metrics =='coxAndclassif':
-            plt.subplot(3,2 ,6)
-            plt.plot(fitting.history['Partial_likelihood_tf_cindexR'], label="train")
-            plt.plot(fitting.history['val_Partial_likelihood_tf_cindexR'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_tf_cindex'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('cindex')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(3,2 ,5)
-            plt.plot(fitting.history['Cross_entropy_loss_acc'], label="train")
-            plt.plot(fitting.history['val_Cross_entropy_loss_acc'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_accuracy'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('accuracy')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(3,2 ,4)
-            plt.plot(fitting.history['Cross_entropy_loss_loss'], label="classif loss")
-            plt.plot(fitting.history['val_Cross_entropy_loss_loss'], label="classif loss")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_calssif_loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('classif loss')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(3, 2 ,3)
-            plt.plot(fitting.history['Partial_likelihood_loss'], label="train")
-            plt.plot(fitting.history['val_Partial_likelihood_loss'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cox_loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('cox loss')
-            plt.xlabel('Epoch')
-     
-        elif metrics =='coxAndmse':
-            plt.subplot(2,2 ,3)
-            plt.plot(fitting.history['mse'], label="train mse")
-            plt.plot(fitting.history['val_mse'], label="valid mse")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_mse loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('mse loss')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(2,2 ,4)
-            plt.plot(fitting.history['cox'], label="train cox")
-            plt.plot(fitting.history['val_cox'], label="valid cox")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cox loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('cox loss')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(2, 2 ,2)
-            plt.plot(fitting.history['tf_cindexR'], label="train")
-            plt.plot(fitting.history['val_tf_cindexR'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cindex'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('C index')
-            plt.xlabel('Epoch')
-            
-        elif metrics=='tf_cindex':
-            plt.subplot(1, 2 ,2)
-            plt.plot(fitting.history['tf_cindexR'], label="train")
-            plt.plot(fitting.history['val_tf_cindexR'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cindex'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('C index')
-            plt.xlabel('Epoch')
-        elif metrics=='tf_cindexTD':
-            plt.subplot(1, 2 ,2)
-            plt.plot(fitting.history['tf_cindexTD'], label="train")
-            plt.plot(fitting.history['val_tf_cindexTD'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cindex'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('C index')
-            plt.xlabel('Epoch')
-        elif metrics=='triplet':
-            plt.subplot(2, 2 ,2)
-            plt.plot(fitting.history['tf_cindexT'], label="train")
-            plt.plot(fitting.history['val_tf_cindexT'], label="valid")
-            titleA = title + '_cindex'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('C index')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(2,2 ,4)            
-            plt.plot(fitting.history['acc'], label="train")
-            plt.plot(fitting.history['val_acc'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_accuracy'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('Accuracy')
-            plt.xlabel('Epoch')
-        elif metrics == 'RankAnddiscret':
-            plt.subplot(2,2 ,3)
-            plt.plot(fitting.history['rankL'], label="train rank")
-            plt.plot(fitting.history['val_rankL'], label="valid rank")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_rank loss'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('rank loss')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(2,2 ,4)
-            plt.plot(fitting.history['tf_cindexTD'], label="train")
-            plt.plot(fitting.history['val_tf_cindexTD'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_cindex'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('C index')
-            plt.xlabel('Epoch')
-            
-            plt.subplot(2, 2 ,2)
-            plt.plot(fitting.history['discretcox'], label="train")
-            plt.plot(fitting.history['val_discretcox'], label="valid")
-            #plt.plot(fitting.history['test_acc'], label="test")
-            titleA = title + '_surv_likelihood'
-            plt.title(titleA)
-            pylab.legend(loc='upper left')
-            plt.ylabel('C index')
-            plt.xlabel('Epoch')
-            
-            
-        if metrics == 'cox'or metrics == 'accuracy' or metrics == 'tf_cindexTD':
-            plt.subplot(1, 2 ,1)
+
+        if metrics in ['cox', 'accuracy', 'tf_cindexTD']:
+            plt.subplot(1, 2, 1)
         elif metrics == 'coxAndclassif':
-            plt.subplot(3,2 ,1)
+            plt.subplot(3, 2, 1)
         else:
-            plt.subplot(2, 2 ,1)
+            plt.subplot(2, 2, 1)
+
         plt.plot(fitting.history['loss'], label="train")
         plt.plot(fitting.history['val_loss'], label="valid")
-        #  plt.plot(fitting.history['test_loss'], label="test")
-        titleL = title + '_loss'
-        plt.title(titleL)
-        pylab.legend(loc='upper left')
+        plt.title(title + '_loss')
+        plt.legend(loc='upper left')
         plt.ylabel('Loss')
         plt.xlabel('Epoch')
-        #plt.show()
-        pathSaveFIG = os.path.join(file, f'{title}_curves.png'
-        plt.savefig(pathSaveFIG)
-    plt.close('all')
-    results = pd.DataFrame(np.zeros((2, 2)),columns=['Loss',metrics],index = ['train','val'])
-    results.loc["train",metrics] =eval_train[1]
-    results.loc["train",'Loss'] = eval_train[0]
-    results.loc["val",metrics] = eval_val[1]
-    results.loc["val",'Loss'] = eval_val[0]
-    if resu != None:
-        results.loc["test",metrics] = resu
+
+        plt.savefig(os.path.join(file_images, f'{title}_curves.png'))
+        plt.close('all')
+
+    results = pd.DataFrame(index=['train', 'val'], columns=['Loss', metrics])
+    results.loc['train', 'Loss'] = eval_train[0]
+    results.loc['train', metrics] = eval_train[1]
+    results.loc['val', 'Loss'] = eval_val[0]
+    results.loc['val', metrics] = eval_val[1]
+
+    if resu is not None:
+        results.loc['test', metrics] = resu
 
     return results
 
+def makeTifFromPile(path_to_pile:Path, correct):
+    """Takes an absolute path containing a pile of masks, compute the resulting .tif mask and
+     output the path to the created .tif mask
 
-def makeTifFromPile(pathToPile,correct):
-    '''Takes an absolute path containing a pile of masks, compute the resulting .tif mask and
-     output the path to the created .tif mask'''
-    list_pileFiles = []
-    for dirpath, dirnames, fileNames in os.walk(pathToPile):
-        for fileName in fileNames:
-            if not fileName.startswith('.'):
-                list_pileFiles.append(os.path.join(dirpath, fileName))
-    change_name(list_pileFiles)
+    Args:
+        path_to_pile (Path): path to pile of masks
+        correct (_type_): _description_
 
-    list_pileFiles = []
-    for dirpath, dirnames, fileNames in os.walk(pathToPile):
-        for fileName in fileNames:
-            if not fileName.startswith('.'):
-                    list_pileFiles.append(os.path.join(dirpath, fileName))
-                    
-    list_pileFiles.sort()   
-    size=len(list_pileFiles)
-    list_pileFiles=list_pileFiles[correct['avant']:size-correct['apres']]
-    first_file = list_pileFiles[0]
+    Raises:
+        ValueError: Unknown mask type in path: must contain 'max' or 'tous'.
+
+    Returns:
+        Path: path to tif mask
+    """
+
+    # Collect all mask files from the given directory
+    pile_files = [
+        os.path.join(dirpath, file)
+        for dirpath, _, filenames in os.walk(path_to_pile)
+        for file in filenames if not file.startswith('.')
+    ]
+    
+    change_name(pile_files)
+    
+    # Recollect files after renaming
+    pile_files = [
+        os.path.join(dirpath, file)
+        for dirpath, _, filenames in os.walk(path_to_pile)
+        for file in filenames if not file.startswith('.')
+    ]
+    
+    pile_files.sort()
+    pile_files = pile_files[correct['avant']:len(pile_files)-correct['apres']]
+    
+    # Determine the shape of the images
+    first_file = pile_files[0]
     # get the shape of the image
-    with open(first_file, mode='r', encoding='utf-8') as tifFile:
-        tifFile.readline()  # first line is junk data
-        shapeLocalMask = getWords(tifFile.readline())  
-        xShape = int(shapeLocalMask[0])
-        yShape = int(shapeLocalMask[1])
+    with open(first_file, mode='r', encoding='utf-8') as tif_file:
+        tif_file.readline()  # first line is junk data
+        x_shape, y_shape = map(int, get_words(tif_file.readline()))  
 
-    num_file = len(list_pileFiles)
+    num_files = len(pile_files)
+    mask_array = np.zeros((num_files, x_shape, y_shape), dtype=np.uint8)
     
-    mask_array = np.zeros((num_file, xShape, yShape))
-    fileIndex = 0
-    # Run through the files of the pile
-    for pileFile in list_pileFiles:
-        with open(pileFile, mode='r', encoding='utf-8') as tifFile:
-            tifFile.readline()  # junk line
-            tifFile.readline()  # second line is shape of the dcm pile
-            tifFile.readline()  # third line is junk data
-            # Run through rows and columns of the file
-            
-            for rowIndex in range(xShape):
-                for colIndex in range(yShape):
-                    val = tifFile.read(1)
-                    # Takes only 0 and 1 values (removes spaces)
-                    while val != '0' and val != '1':
-                        val = tifFile.read(1)
-                    mask_array[fileIndex, rowIndex, colIndex] = int(val)
-            fileIndex = fileIndex + 1    
-    pathToLesion = os.path.abspath(os.path.join(pathToPile, os.pardir))
-    if 'max' in pathToPile:
-        pathToTifMask = os.path.join(pathToLesion, 'max.tif')
+    # Process each file and fill the mask array
+    for file_index, pile_file in enumerate(pile_files):
+        with open(pile_file, mode='r', encoding='utf-8') as tif_file:
+            for _ in range(3):  # Skip the first three lines
+                tif_file.readline()
+                # first line is junk line, second line is shape of the dcm pile
+                # third line is junk data
+            for row_index in range(x_shape):
+                col_index = 0
+                while col_index < y_shape:
+                    val = tif_file.read(1)
+                    if val in '01':  # Only consider '0' and '1'
+                        mask_array[file_index, row_index, col_index] = int(val)
+                        col_index += 1
 
-    if 'tous' in pathToPile:
-        pathToTifMask = os.path.join(pathToLesion, 'all.tif')
-
-    mask_array=mask_array.astype(np.uint8)
-    imsave(pathToTifMask, mask_array)
-    return pathToTifMask
-
-
-def predictionShow(name,y,prediction,writer,sess, file, titleP,log_dir, number=1000):
-    if len(y) < number:
-        number=len(y)
-    if len(np.shape(prediction)) == 1:
-        prediction = np.reshape(np.array(prediction), (-1 ,1))
-    # y = np.array(y)
-    print(np.shape(y))
-    print(np.shape(prediction))
-    rank = prediction[0:number,0].argsort() #il faut aller chercher le .. puis le .. puis le ...
-    
-    array=np.array([y[rank,0],y[rank,1],prediction[rank,0]])                  
-
-    evalu = [tf.convert_to_tensor([str(array[0,i]) for i in range(number)]),
-             tf.convert_to_tensor([str(array[1,i]) for i in range(number)]),
-            tf.convert_to_tensor([str(array[2,i]) for i in range(number)])         ]
-    s = sess.run(tf.summary.text(f'Ranked{name}Prediction', tf.stack(evalu)))
-    writer.add_summary(s)
-    
-    time_pred_figure = os.path.join(file,f'{titleP}{name}Pred.png')
-    axi=plt.plot(array[2,np.where(array[0,:]==0)],array[1,np.where(array[0,:]==0)],'ro',label='with censorship')                    
-    axi=plt.plot(array[2,np.where(array[0,:]==1)],array[1,np.where(array[0,:]==1)],'bo',label='without censorship')
-    axi=plt.xlabel(f'{name} prediction')
-    axi=plt.ylabel('real time')
-    axi=plt.title(f'time according to {name} prediction (red: censorship)')
-    axi.get_figure().savefig(time_pred_figure)
-    plt.close()
-    curves = plt.imread(time_pred_figure)
-    
-    writer = tf.summary.FileWriter(log_dir)
-    fi = tf.convert_to_tensor(np.reshape( curves,(1,np.shape(curves)[0],np.shape(curves)[1],np.shape(curves)[2])))
-    s = sess.run(tf.summary.image(f'{name}predictions', tf.stack(fi)))
-    writer.add_summary(s)
-    plt.close()
-    return axi
-
-def findBestSep(ytrain,predictiontrain):
-    if len(np.shape(predictiontrain))==2:
-        predd = predictiontrain[:,0]
+    # Determine the output file path
+    path_to_lesion = os.path.abspath(os.path.join(path_to_pile, os.pardir))
+    if 'max' in path_to_pile:
+        path_to_tif_mask = os.path.join(path_to_lesion, 'max.tif')
+    elif 'tous' in path_to_pile:
+        path_to_tif_mask = os.path.join(path_to_lesion, 'all.tif')
     else:
-        predd = predictiontrain
-    df = pd.DataFrame(np.array([ytrain[:,0],ytrain[:,1],predd,np.zeros((len(ytrain[:,0])))]).T)
-    df.columns=['event','time','prediction','groupe']
-    #pour chaque separation calculer log rank
-    bestPval = 1000
-    testStat = 0
-    bestPval2 = 1000
-    testStat2 = 0
-    bestsep2 = 1000
-    bestsep =1000
-    numG02=0
-    numG12=0
-    sep = (np.max(predd) - np.min(predd))/20
-    for ki in range(1,20):
-        ssp = np.min(predd) + sep*ki
-        groupe1 = df[df['prediction']<=ssp]
-        groupe2 = df[df['prediction']>ssp]
-        if len(groupe1) >= 0.1*len(df) and len(groupe2) >= 0.1*len(df):
-            # group1=df[df['groupe']==0]
-            # group2=df[df['groupe']==1]
-            T1=groupe1['time']
-            E1=groupe1['event']
-            T2=groupe2['time']
-            E2=groupe2['event']
-        
-            results=logrank_test(T1,T2,event_observed_A=E1, event_observed_B=E2)
-            if results.p_value < bestPval:
-                bestPval = results.p_value
-                testStat = results.test_statistic
-                bestsep = ssp
-                numG0= len(groupe1)
-                numG1 = len(groupe2)
-        elif len(groupe1) >= 2 and len(groupe2) >= 2:
-            T1=groupe1['time']
-            E1=groupe1['event']
-            T2=groupe2['time']
-            E2=groupe2['event']
-        
-            results=logrank_test(T1,T2,event_observed_A=E1, event_observed_B=E2)
-            if results.p_value < bestPval2:
-                bestPval2 = results.p_value
-                testStat2 = results.test_statistic
-                bestsep2 = ssp
-                numG02= len(groupe1)
-                numG12 = len(groupe2)
-            #○results.print_summary()
-    if bestPval == 1000:
-        bestPval  =bestPval2
-        testStat =testStat2
-        bestsep=     bestsep2
-        numG0=numG02
-        numG1=numG12
-            
-    return bestPval,testStat,bestsep,numG0,numG1 
+        raise ValueError("Unknown mask type in path: must contain 'max' or 'tous'.")
 
-def groupeByBestSep(ytrain,predictiontrain,bestsep,file,titleP,name,sess,typee = 'risk'):    
-    if len(np.shape(predictiontrain))==2:
-        predd = predictiontrain[:,0]
+    # Save the mask array as a .tif file
+    imsave(path_to_tif_mask, mask_array)
+    
+    return path_to_tif_mask
+
+
+def display_predictions(name, y, prediction, writer, sess, file_images, titleP, log_dir, number=1000):
+    """
+    Displays and logs the predictions, comparing them with the true values.
+    
+    Args:
+        name (str): Name of the prediction model.
+        y (array-like): True values.
+        prediction (array-like): Predicted values.
+        writer (tf.summary.FileWriter): TensorBoard writer.
+        sess (tf.Session): TensorFlow session.
+        file_images (str): Directory to save plots.
+        titleP (str): Title prefix for plots.
+        log_dir (str): Directory for TensorBoard logs.
+        number (int, optional): Number of samples to display. Default is 1000.
+    
+    Returns:
+        Matplotlib axis with the plot.
+    """
+    
+    number = min(len(y), number)
+    prediction = np.reshape(np.array(prediction), (-1, 1)) if len(prediction.shape) == 1 else prediction
+
+    rank = prediction[:number, 0].argsort()
+    ranked_array = np.array([y[rank, 0], y[rank, 1], prediction[rank, 0]])
+
+    evalu = [
+        tf.convert_to_tensor([str(ranked_array[0, i]) for i in range(number)]),
+        tf.convert_to_tensor([str(ranked_array[1, i]) for i in range(number)]),
+        tf.convert_to_tensor([str(ranked_array[2, i]) for i in range(number)])
+    ]
+    summary_text = sess.run(tf.summary.text(f'Ranked{name}Prediction', tf.stack(evalu)))
+    writer.add_summary(summary_text)
+    
+    plot_path = os.path.join(file_images, f'{titleP}{name}Pred.png')
+    plt.plot(ranked_array[2, np.where(ranked_array[0, :] == 0)], ranked_array[1, np.where(ranked_array[0, :] == 0)], 'ro', label='with censorship')
+    plt.plot(ranked_array[2, np.where(ranked_array[0, :] == 1)], ranked_array[1, np.where(ranked_array[0, :] == 1)], 'bo', label='without censorship')
+    plt.xlabel(f'{name} prediction')
+    plt.ylabel('real time')
+    plt.title(f'Time according to {name} prediction (red: censorship)')
+    plt.legend()
+    plt.savefig(plot_path)
+    plt.close()
+    
+    curves = plt.imread(plot_path)
+    reshaped_curves = np.reshape(curves, (1, *curves.shape))
+    summary_image = sess.run(tf.summary.image(f'{name}predictions', tf.convert_to_tensor(reshaped_curves)))
+    writer.add_summary(summary_image)
+    
+    return plt.gca()
+
+
+def get_optimal_separation(ytrain, predictions_train) -> dict:
+    """
+    Determines the optimal separation threshold for the given training data and predictions by
+    performing log-rank tests to identify the threshold with the best p-value.
+
+    Args:
+        ytrain (array-like): Training data with columns [event, time].
+        predictions_train (array-like): Predictions corresponding to the training data.
+
+    Returns:
+        dict: Contains the best p-value, test statistic, best separation threshold, 
+               number of samples in group 0, and number of samples in group 1.
+    """
+    predictions = predictions_train[:, 0] if predictions_train.ndim == 2 else predictions_train
+    df = pd.DataFrame({
+        'event': ytrain[:, 0],
+        'time': ytrain[:, 1],
+        'prediction': predictions,
+        'group': np.zeros(len(ytrain))
+    })
+
+    best = {
+        'pval': float('inf'),
+        'stat': 0,
+        'separation': float('inf'),
+        'num_g0': 0,
+        'num_g1': 0
+    }
+
+    best_alt = {
+        'pval': float('inf'),
+        'stat': 0,
+        'separation': float('inf'),
+        'num_g0': 0,
+        'num_g1': 0
+    }
+
+    sep_step = (np.max(predictions) - np.min(predictions)) / 20
+
+    for i in range(1, 20):
+        sep_threshold = np.min(predictions) + sep_step * i
+        group1 = df[df['prediction'] <= sep_threshold]
+        group2 = df[df['prediction'] > sep_threshold]
+
+        if len(group1) >= 0.1 * len(df) and len(group2) >= 0.1 * len(df):
+            T1, E1 = group1['time'], group1['event']
+            T2, E2 = group2['time'], group2['event']
+            results = logrank_test(T1, T2, event_observed_A=E1, event_observed_B=E2)
+            if results.p_value < best['pval']:
+                best.update({
+                    'pval': results.p_value,
+                    'stat': results.test_statistic,
+                    'separation': sep_threshold,
+                    'num_g0': len(group1),
+                    'num_g1': len(group2)
+                })
+                
+        elif len(group1) >= 2 and len(group2) >= 2:
+            T1, E1 = group1['time'], group1['event']
+            T2, E2 = group2['time'], group2['event']
+            results = logrank_test(T1, T2, event_observed_A=E1, event_observed_B=E2)
+            if results.p_value < best_alt['pval']:
+                best_alt.update({
+                    'pval': results.p_value,
+                    'stat': results.test_statistic,
+                    'separation': sep_threshold,
+                    'num_g0': len(group1),
+                    'num_g1': len(group2)
+                })
+
+    if best['pval'] == float('inf'):
+        best = best_alt
+            
+    return best
+
+
+
+def group_by_optimal_separation(ytrain, predictions_train, optimal_separation, file_images, titleP, name, sess, typee='risk'):
+    """
+    Groups data based on the optimal separation threshold and computes log-rank test statistics.
+    Optionally plots Kaplan-Meier curves and saves them as images.
+
+    Args:
+        ytrain (array-like): Training data with columns [event, time].
+        predictions_train (array-like): Predictions corresponding to the training data.
+        optimal_separation (float): Optimal separation threshold.
+        file_images (str): Directory to save images and logs.
+        titleP (str): Prefix for saved image files.
+        name (str): Name identifier for the plot.
+        sess (tf.Session): TensorFlow session for summary writing.
+        typee (str, optional): Type of analysis ('risk' or 'time'). Defaults to 'risk'.
+
+    Returns:
+        tuple: Contains p-value from the log-rank test, best separation threshold,
+               number of samples in group 0, and number of samples in group 1.
+    """
+    if len(np.shape(predictions_train)) == 2:
+        predd = predictions_train[:, 0]
     else:
-        predd = predictiontrain
-    df = pd.DataFrame(np.array([ytrain[:,0],ytrain[:,1],predd,np.zeros((len(ytrain[:,0])))]).T)
-    df.columns=['event','time','prediction','groupe']
-    groupe1 = df[df['prediction']<=bestsep]
-    groupe2 = df[df['prediction']>bestsep]
-    results=logrank_test(groupe1['time'],groupe2['time'],event_observed_A=groupe1['event'], event_observed_B=groupe2['event'])
+        predd = predictions_train
+
+    df = pd.DataFrame({
+        'event': ytrain[:, 0],
+        'time': ytrain[:, 1],
+        'prediction': predd,
+        'group': np.zeros(len(ytrain))
+    })
+
+    groupe1 = df[df['prediction'] <= optimal_separation]
+    groupe2 = df[df['prediction'] > optimal_separation]
+
+    results = logrank_test(groupe1['time'], groupe2['time'], event_observed_A=groupe1['event'], event_observed_B=groupe2['event'])
     pval = results.p_value
-    numG0= len(groupe1)
+    numG0 = len(groupe1)
     numG1 = len(groupe2)
+
+    kmf = KaplanMeierFitter()
+
     if typee == 'time':
-        kmf = KaplanMeierFitter()
         kmf.fit(groupe1['time'], groupe1['event'], label='bad prognosis')
         axa = kmf.plot()
-        kmf = KaplanMeierFitter()
         kmf.fit(groupe2['time'], groupe2['event'], label='good prognosis')
         axa = kmf.plot(ax=axa)
     else:
-        kmf = KaplanMeierFitter()
         kmf.fit(groupe1['time'], groupe1['event'], label='good prognosis')
         axa = kmf.plot()
-        kmf = KaplanMeierFitter()
         kmf.fit(groupe2['time'], groupe2['event'], label='bad prognosis')
         axa = kmf.plot(ax=axa)
-    
-    kaplan_figure = os.path.join(file,f"{titleP}{name}Kaplan.png")
-    axa.get_figure().savefig(kaplan_figure)   
+
+    kaplan_figure = os.path.join(file_images, f"{titleP}{name}Kaplan.png")
+    axa.get_figure().savefig(kaplan_figure)
     plt.close()
     curves2 = plt.imread(kaplan_figure)
-    
-    log_dir = os.path.join(file,"logs","fit",titleP) 
 
+    log_dir = os.path.join(file_images, "logs", "fit", titleP)
     writer = tf.summary.FileWriter(log_dir)
-    fi2 = tf.convert_to_tensor(np.reshape( curves2,(1,np.shape(curves2)[0],np.shape(curves2)[1],np.shape(curves2)[2])))
-    s = sess.run(tf.summary.image(f'{name}kaplanMeier', tf.stack(fi2)))
+    fi2 = tf.convert_to_tensor(np.reshape(curves2, (1, *np.shape(curves2))))
+    s = sess.run(tf.summary.image(f'{name}kaplanMeier', fi2))
     writer.add_summary(s)
     plt.close()
-    return  pval,bestsep,numG0,numG1 
+
+    return pval, optimal_separation, numG0, numG1
